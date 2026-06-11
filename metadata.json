@@ -1,0 +1,6 @@
+{
+  "name": "Focus Now",
+  "description": "Premium habit tracker and neurological momentum engine to shift your productivity identity.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

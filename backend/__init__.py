@@ -1,0 +1,1 @@
+# FastAPI root package marker
