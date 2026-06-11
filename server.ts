@@ -1,7 +1,6 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
-import { createServer as createViteServer } from "vite";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { config as loadDotenv } from "dotenv";
@@ -717,6 +716,7 @@ async function startServer() {
 
   // Vite middleware setup for dev vs prod asset delivery
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true, hmr: false },
       appType: "spa",
@@ -725,7 +725,8 @@ async function startServer() {
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
-    app.get("*", (req, res) => {
+    // Catch-all: serve index.html for any non-API route (SPA routing)
+    app.get(/^(?!\/api).*$/, (_req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
   }
