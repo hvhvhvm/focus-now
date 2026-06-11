@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Sidebar from './components/Sidebar';
+import BottomNav from './components/BottomNav';
 import Dashboard from './components/Dashboard';
 import HabitsPage from './components/HabitsPage';
 import MomentumPage from './components/MomentumPage';
@@ -290,10 +291,10 @@ export default function App() {
       // Update every local view immediately after the server confirms deletion.
       setHabits((currentHabits) => currentHabits.filter((habit) => habit.id !== id));
       setRoutines((currentRoutines) =>
-        currentRoutines.map((routine) => ({
-          ...routine,
-          habitIds: routine.habitIds.filter((habitId) => habitId !== id)
-        }))
+          currentRoutines.map((routine) => ({
+            ...routine,
+            habitIds: routine.habitIds.filter((habitId) => habitId !== id)
+          }))
       );
     } catch (err: any) {
       alert('Failed to delete habit: ' + err.message);
@@ -343,7 +344,7 @@ export default function App() {
   const { score: currentLiveMomentumScore } = calculateMomentum(habits);
 
   return (
-    <div className="flex bg-[#0A0B0E] min-h-screen text-gray-100 font-sans antialiased overflow-x-hidden">
+    <div className="flex flex-col md:flex-row bg-[#0A0B0E] min-h-screen text-gray-100 font-sans antialiased overflow-x-hidden">
       
       {/* 1. Sidebar Left */}
       <Sidebar
@@ -361,7 +362,7 @@ export default function App() {
       />
 
       {/* 2. Main Content Body */}
-      <main className="flex-1 p-6 md:p-10 max-h-screen overflow-y-auto relative">
+      <main className="flex-1 p-6 md:p-10 pb-24 md:pb-10 max-h-screen overflow-y-auto relative">
         
         {/* Database backend active system flag */}
         <div className="absolute top-4 right-10 flex items-center gap-1.5 bg-[#0F111A] border border-green-900/30 px-3 py-1 rounded-full text-[10px] text-green-400 font-mono select-none z-50">
@@ -419,6 +420,19 @@ export default function App() {
           />
         )}
       </main>
+
+      {/* Fixed bottom navigation for mobile viewports */}
+      <BottomNav
+        currentTab={currentTab}
+        setTab={(t) => {
+          setTab(t);
+          setSelectedRoutineId(null);
+          setSelectedCategoryId(null);
+        }}
+        momentumScore={currentLiveMomentumScore}
+        currentUser={currentUser}
+        onLogout={handleLogout}
+      />
 
       {/* 3. Global Control Modals */}
       <CreateHabitModal

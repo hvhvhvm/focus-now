@@ -390,7 +390,7 @@ export default function HabitsPage({
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
       {/* 1. Category filter row across the top (Image 1 and 2 style) */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-[#1A1D24] pb-4">
+      <div className="flex flex-nowrap items-center gap-2 border-b border-[#1A1D24] pb-4 overflow-x-auto scrollbar-hide py-1">
         {(['All', 'Health', 'Fitness', 'Study', 'Reading', 'Productivity', 'Mindfulness', 'Social'] as const).map((cat) => {
           const isActive = selectedCategory === cat;
           const progress = cat !== 'All' ? getCategoryStats(cat as any) : 0;
@@ -404,7 +404,7 @@ export default function HabitsPage({
                   setSelectedCategory(cat);
                 }
               }}
-              className={`flex items-center space-x-1.5 px-3.5 py-2 rounded-full text-xs font-medium cursor-pointer transition-all duration-150 ${
+              className={`flex-shrink-0 flex items-center space-x-1.5 px-3.5 py-2 rounded-full text-xs font-medium cursor-pointer transition-all duration-150 ${
                 selectedCategory === cat
                   ? 'bg-[#181C24] border border-[#2E3547] text-white shadow-lg'
                   : 'bg-[#121419]/60 border border-transparent text-gray-400 hover:text-white hover:bg-[#1A1C24]'
@@ -637,7 +637,7 @@ export default function HabitsPage({
                                 <button
                                   key={val}
                                   onClick={() => onLogHabit(item.id, val)}
-                                  className="border border-[#12B886]/15 bg-[#12B886]/03 text-[#12B886] hover:bg-[#12B886]/10 py-1 rounded-xl flex-1 text-xs font-extrabold cursor-pointer transition duration-150 font-mono text-center"
+                                  className="border border-[#12B886]/15 bg-[#12B886]/03 text-[#12B886] hover:bg-[#12B886]/10 py-3 min-h-[44px] rounded-xl flex-1 text-xs font-extrabold cursor-pointer transition duration-150 font-mono text-center active:scale-95"
                                 >
                                   +{val}{item.type === 'Timer' ? 'm' : ''}
                                 </button>
@@ -648,7 +648,7 @@ export default function HabitsPage({
                           {/* Action Button: Finish/Complete Habit */}
                           <div className="mt-3 relative z-10">
                             {isCompleted ? (
-                              <div className="w-full bg-[#12B886]/10 border border-[#12B886]/30 text-[#12B886] py-2 px-3 rounded-xl text-xs font-bold text-center flex items-center justify-center space-x-1.5 select-none hover:bg-[#12B886]/15 transition duration-150">
+                              <div className="w-full bg-[#12B886]/10 border border-[#12B886]/30 text-[#12B886] py-3 min-h-[44px] px-3 rounded-xl text-xs font-bold text-center flex items-center justify-center space-x-1.5 select-none hover:bg-[#12B886]/15 transition duration-150">
                                 <Check className="w-4 h-4 stroke-[3px]" />
                                 <span>Done for Today! 🎉</span>
                               </div>
@@ -656,7 +656,7 @@ export default function HabitsPage({
                               <button
                                 type="button"
                                 onClick={() => onLogHabit(item.id, remaining)}
-                                className="w-full bg-[#12b886]/10 hover:bg-[#12b886]/20 border border-[#12b886]/30 hover:border-[#12b886]/50 text-[#12b886] py-2 px-3 rounded-xl text-xs font-extrabold cursor-pointer transition duration-150 text-center flex items-center justify-center space-x-1.5 select-none"
+                                className="w-full bg-[#12b886]/10 hover:bg-[#12b886]/20 border border-[#12b886]/30 hover:border-[#12b886]/50 text-[#12b886] py-3 min-h-[44px] px-3 rounded-xl text-xs font-extrabold cursor-pointer transition duration-150 text-center flex items-center justify-center space-x-1.5 select-none active:scale-95"
                               >
                                 <Check className="w-4 h-4 stroke-[3px]" />
                                 <span>Complete Habit</span>

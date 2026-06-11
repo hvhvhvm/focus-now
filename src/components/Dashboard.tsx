@@ -247,7 +247,7 @@ export default function Dashboard({
         </div>
 
         <div className="flex items-center space-x-6 w-full md:w-auto justify-between md:justify-end">
-          <div className="bg-[#14161F]/95 border border-[#232734] rounded-2xl p-4 flex items-center space-x-4 max-w-xs shadow-md relative overflow-hidden group/header-gauge hover:border-[#12B886]/30 hover:shadow-[0_0_20px_rgba(18,184,134,0.12)] transition-all duration-350">
+          <div className="hidden md:flex bg-[#14161F]/95 border border-[#232734] rounded-2xl p-4 items-center space-x-4 max-w-xs shadow-md relative overflow-hidden group/header-gauge hover:border-[#12B886]/30 hover:shadow-[0_0_20px_rgba(18,184,134,0.12)] transition-all duration-350">
             {/* Ambient subtle glow back layer */}
             <div className="absolute inset-0 bg-gradient-to-tr from-[#12B886]/5 to-transparent opacity-0 group-hover/header-gauge:opacity-100 transition-opacity duration-350 pointer-events-none" />
             
@@ -330,68 +330,90 @@ export default function Dashboard({
         })}
       </div>
 
-      {/* 2. Primary Metrics: Points, Momentum, and Compounding Index */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* 2. Primary Metrics: Progress, Points, Momentum, and Compounding Index */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
         
-        {/* Card A: POINTS TODAY */}
-        <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-5 flex flex-col justify-between h-44 relative overflow-hidden group hover:border-[#12B886]/40 hover:shadow-[0_0_25px_rgba(18,184,134,0.12)] transition-all duration-300">
-          <div className="absolute top-0 right-0 w-36 h-36 bg-gradient-to-br from-[#12B886]/10 to-transparent rounded-full blur-2xl pointer-events-none" />
-          <div className="relative z-10">
+        {/* Card 1: PROGRESS TODAY */}
+        <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-4 sm:p-5 flex flex-col justify-between h-36 sm:h-40 md:h-44 relative overflow-hidden group hover:border-[#12B886]/40 hover:shadow-[0_0_25px_rgba(18,184,134,0.12)] transition-all duration-300">
+          <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-br from-[#12B886]/5 to-transparent rounded-full blur-2xl pointer-events-none" />
+          <div className="relative z-10 text-left">
             <div className="flex items-center text-[10px] font-mono text-gray-500 tracking-wider select-none">
-              POINTS TODAY
-              <span className="text-[10px] ml-1 text-gray-400 cursor-pointer">ⓘ</span>
+              PROGRESS TODAY
+              <span className="text-[10px] ml-1 text-gray-400 cursor-pointer hidden sm:inline">ⓘ</span>
             </div>
-            <div className="mt-2 text-4xl font-extrabold text-white font-sans text-left tracking-tight">
-              {earnedPointsToday} <span className="text-gray-600 font-light text-2xl">/</span> <span className="text-gray-400 font-medium text-3xl">{totalPotentialPoints}</span>
+            <div className="mt-1 sm:mt-2 text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#12B886] font-sans tracking-tight">
+              {overallTodayProgress}%
             </div>
           </div>
 
-          <div className="relative z-10">
-            <div className="w-full h-2 bg-[#171924] rounded-full overflow-hidden mt-4">
+          <div className="relative z-10 text-left">
+            <div className="w-full h-1.5 bg-[#171924] rounded-full overflow-hidden mt-2">
               <div
-                className="h-full bg-gradient-to-r from-[#12B886] to-[#A9E34B] transition-all duration-500 rounded-full"
-                style={{ width: `${totalPotentialPoints > 0 ? (earnedPointsToday / totalPotentialPoints) * 100 : 0}%`, boxShadow: '0 0 8px #12B886dd' }}
+                className="h-full bg-[#12B886] transition-all duration-500 rounded-full"
+                style={{ width: `${overallTodayProgress}%`, boxShadow: '0 0 6px #12B886dd' }}
               />
             </div>
-            <div className="flex items-center justify-between text-xs font-semibold text-gray-400 mt-3 select-none">
-              <span>{totalPotentialPoints - earnedPointsToday} left today</span>
-              <span className="border border-[#12B886]/40 bg-[#12B886]/10 text-[#12B886] px-1.5 py-0.5 rounded text-[10px] font-mono font-bold shadow-[0_0_10px_rgba(18,184,134,0.15)]">
+            <div className="flex items-center justify-between text-[11px] font-semibold text-gray-400 mt-2 select-none">
+              <span>{doneTodayCount}/{totalTodayCount} done</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 2: POINTS TODAY */}
+        <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-4 sm:p-5 flex flex-col justify-between h-36 sm:h-40 md:h-44 relative overflow-hidden group hover:border-[#12B886]/40 hover:shadow-[0_0_25px_rgba(18,184,134,0.12)] transition-all duration-300">
+          <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-br from-[#12B886]/5 to-transparent rounded-full blur-2xl pointer-events-none" />
+          <div className="relative z-10 text-left">
+            <div className="flex items-center text-[10px] font-mono text-gray-500 tracking-wider select-none">
+              POINTS TODAY
+              <span className="text-[10px] ml-1 text-gray-400 cursor-pointer hidden sm:inline">ⓘ</span>
+            </div>
+            <div className="mt-1 sm:mt-2 text-xl sm:text-2xl md:text-3xl font-extrabold text-white font-sans tracking-tight truncate">
+              {earnedPointsToday} <span className="text-gray-600 font-light text-sm sm:text-lg">/</span> <span className="text-gray-400 font-medium text-lg sm:text-xl">{totalPotentialPoints}</span>
+            </div>
+          </div>
+
+          <div className="relative z-10 text-left">
+            <div className="w-full h-1.5 bg-[#171924] rounded-full overflow-hidden mt-2">
+              <div
+                className="h-full bg-gradient-to-r from-[#12B886] to-[#A9E34B] transition-all duration-500 rounded-full"
+                style={{ width: `${totalPotentialPoints > 0 ? (earnedPointsToday / totalPotentialPoints) * 100 : 0}%`, boxShadow: '0 0 6px #12B886dd' }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-[11px] font-semibold text-gray-400 mt-2 select-none">
+              <span className="hidden sm:inline">{totalPotentialPoints - earnedPointsToday} left</span>
+              <span className="border border-[#12B886]/40 bg-[#12B886]/10 text-[#12B886] px-1.5 py-0.5 rounded text-[9px] font-mono font-bold">
                 Lv. {Math.floor(userPoints / 100) + 1}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Card B: MOMENTUM */}
-        <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-5 flex flex-col justify-between h-44 relative overflow-hidden group hover:border-red-500/30 hover:shadow-[0_0_25px_rgba(250,82,82,0.12)] transition-all duration-300">
-          <div className="absolute top-0 right-0 w-36 h-36 bg-gradient-to-br from-[#FA5252]/10 to-transparent rounded-full blur-2xl pointer-events-none" />
-          <div className="absolute top-4 right-4 w-7 h-7 bg-[#12B886]/10 border border-[#12B886]/20 rounded-full flex items-center justify-center text-[#12B886] relative z-20">
-            <TrendingUp className="w-4 h-4 text-[#FA5252]" />
-          </div>
-
-          <div className="relative z-10">
-            <div className="flex items-center text-[10px] font-mono text-gray-500 tracking-wider text-left select-none">
-              MOMENTUM STATE
-              <span className="text-[10px] ml-1 text-gray-400 cursor-pointer">ⓘ</span>
+        {/* Card 3: MOMENTUM */}
+        <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-4 sm:p-5 flex flex-col justify-between h-36 sm:h-40 md:h-44 relative overflow-hidden group hover:border-red-500/30 hover:shadow-[0_0_25px_rgba(250,82,82,0.12)] transition-all duration-300">
+          <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-br from-[#FA5252]/5 to-transparent rounded-full blur-2xl pointer-events-none" />
+          <div className="relative z-10 text-left">
+            <div className="flex items-center justify-between text-[10px] font-mono text-gray-500 tracking-wider select-none">
+              <span>MOMENTUM</span>
+              <span className="text-[10px] text-gray-400 hidden sm:inline">ⓘ</span>
             </div>
-            <div className="mt-1 text-4xl font-extrabold text-[#FA5252] font-sans text-left tracking-tight filter drop-shadow-[0_0_6px_rgba(250,82,82,0.3)]">
+            <div className="mt-1 sm:mt-2 text-base sm:text-lg md:text-2xl font-extrabold text-[#FA5252] font-sans tracking-tight truncate filter drop-shadow-[0_0_6px_rgba(250,82,82,0.2)]">
               {momentumScore >= 90 ? 'Ultra Focus' : momentumScore >= 75 ? 'Flow State' : momentumScore >= 45 ? 'Ignition' : 'Inertia'}
             </div>
-            <p className="text-xs text-gray-400 font-sans mt-1 text-left font-semibold">
-              {momentumScore >= 45 ? 'Momentum active. Keep it up!' : 'Decay detected. Act today.'}
+            <p className="text-[10px] text-gray-400 font-sans mt-0.5 font-semibold truncate hidden sm:block">
+              {momentumScore >= 45 ? 'Momentum active.' : 'Decay detected.'}
             </p>
           </div>
 
-          <div className="flex items-end justify-between select-none relative z-10">
-            <span className="text-xs font-mono font-bold text-gray-300">
-              {momentumScore}% score
+          <div className="flex items-center justify-between select-none relative z-10 mt-2">
+            <span className="text-[11px] font-mono font-bold text-gray-300">
+              {momentumScore}%
             </span>
-            <svg className="w-24 h-8 overflow-visible shrink-0" viewBox="0 0 100 40">
+            <svg className="w-12 sm:w-20 h-6 overflow-visible shrink-0" viewBox="0 0 100 40">
               <path
                 d="M 0 32 Q 25 18, 50 25 T 85 14 T 100 4"
                 fill="none"
                 stroke={momentumScore >= 45 ? '#12B886' : '#FCC419'}
-                strokeWidth="2.8"
+                strokeWidth="3"
                 strokeLinecap="round"
                 style={{ filter: `drop-shadow(0 0 4px ${momentumScore >= 45 ? 'rgba(18,184,134,0.5)' : 'rgba(252,196,25,0.5)'})` }}
                 className="transition-all duration-300"
@@ -399,7 +421,7 @@ export default function Dashboard({
               <circle
                 cx="100"
                 cy="4"
-                r="3.5"
+                r="4"
                 fill={momentumScore >= 45 ? '#12B886' : '#FCC419'}
                 className="animate-pulse"
               />
@@ -407,41 +429,34 @@ export default function Dashboard({
           </div>
         </div>
 
-        {/* Card C: 1% BETTER COMP_INDEX */}
-        <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-5 flex flex-col justify-between h-44 relative overflow-hidden group hover:border-[#FCC419]/40 hover:shadow-[0_0_25px_rgba(252,196,25,0.12)] transition-all duration-300">
-          <div className="absolute top-0 right-0 w-36 h-36 bg-gradient-to-br from-[#FCC419]/10 to-transparent rounded-full blur-2xl pointer-events-none" />
-          <div className="absolute top-4 right-4 w-7 h-7 bg-[#FCC419]/10 border border-[#FCC419]/20 rounded-full flex items-center justify-center text-[#FCC419] relative z-20">
-            <Sparkles className="w-4 h-4 animate-pulse" />
-          </div>
-
-          <div className="relative z-10">
-            <div className="flex items-center text-[10px] font-mono text-gray-500 tracking-wider text-left select-none">
-              1% BETTER COMP_INDEX
-              <span className="text-[10px] ml-1 text-gray-400 cursor-pointer">ⓘ</span>
+        {/* Card 4: 1% BETTER COMP_INDEX */}
+        <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-4 sm:p-5 flex flex-col justify-between h-36 sm:h-40 md:h-44 relative overflow-hidden group hover:border-[#FCC419]/40 hover:shadow-[0_0_25px_rgba(252,196,25,0.12)] transition-all duration-300">
+          <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-br from-[#FCC419]/5 to-transparent rounded-full blur-2xl pointer-events-none" />
+          <div className="relative z-10 text-left">
+            <div className="flex items-center justify-between text-[10px] font-mono text-gray-500 tracking-wider select-none">
+              <span>COMP INDEX</span>
+              <span className="text-[10px] text-gray-400 hidden sm:inline">ⓘ</span>
             </div>
-            <div className="mt-1 text-4xl font-extrabold text-white font-sans text-left tracking-tight text-amber-300 filter drop-shadow-[0_0_6px_rgba(252,196,25,0.35)]">
+            <div className="mt-1 sm:mt-2 text-xl sm:text-2xl md:text-3xl font-extrabold text-[#FCC419] font-sans tracking-tight filter drop-shadow-[0_0_6px_rgba(252,196,25,0.2)]">
               +{activeGrowthValue.toFixed(1)}%
             </div>
-            <p className="text-xs text-gray-400 font-sans mt-1 text-left font-semibold">
-              {currentBetterLevelName}
-            </p>
           </div>
 
-          <div className="flex items-end justify-between select-none relative z-10">
-            <div className="flex flex-col text-left">
-              <div className="w-24 h-1.5 bg-[#171924] rounded-full overflow-hidden mb-2">
+          <div className="flex items-end justify-between select-none relative z-10 mt-2 text-left">
+            <div className="flex flex-col w-full">
+              <div className="w-full h-1 bg-[#171924] rounded-full overflow-hidden mb-1.5">
                 <div
                   className="h-full bg-[#FCC419] transition-all duration-500 rounded-full"
                   style={{ width: `${Math.min(100, (activeGrowthValue / 30) * 100)}%`, boxShadow: '0 0 6px #FCC419dd' }}
                 />
               </div>
-              <span className="text-xs font-bold text-gray-400">
-                Streak: <span className="text-[#FCC419] font-mono">{betterStreak} days</span>
+              <span className="text-[10px] font-bold text-gray-400 truncate">
+                Streak: <span className="text-[#FCC419] font-mono">{betterStreak}d</span>
               </span>
             </div>
             <button 
               onClick={() => setTab('1%better')}
-              className="text-[10px] font-mono font-semibold bg-[#12141C] border border-[#232734] text-gray-300 px-3 py-1.5 rounded-lg cursor-pointer hover:bg-gray-800 hover:text-[#FCC419] hover:border-[#FCC419]/40 transition duration-300 shadow-md"
+              className="text-[9px] font-mono font-bold bg-[#12141C] border border-[#232734] text-gray-300 px-2 py-1 rounded ml-2 cursor-pointer hover:bg-gray-800 hover:text-[#FCC419] hover:border-[#FCC419]/40 transition duration-350 shadow-sm hidden xs:block"
             >
               MAP
             </button>
@@ -779,29 +794,29 @@ export default function Dashboard({
 
                               {/* Right part: Complete status / buttons */}
                               <div className="flex items-center space-x-3 shrink-0 justify-between md:justify-end w-full md:w-auto relative z-10 border-t border-gray-800/40 pt-3 md:pt-0 md:border-0">
-                                <div className="flex items-center space-x-1.5">
+                                <div className="flex items-center space-x-2 w-full md:w-auto">
                                   <button
                                     onClick={() => handleQuickLog(item.id, Math.ceil(item.target / 3))}
-                                    className="px-2.5 py-1.5 bg-[#12141C] hover:bg-[#1E212E] border border-[#232734] rounded-lg text-xs font-mono font-bold text-gray-400 hover:text-white transition cursor-pointer select-none"
+                                    className="flex-1 md:flex-none px-4 py-3 min-h-[44px] flex items-center justify-center bg-[#12141C] hover:bg-[#1E212E] border border-[#232734] rounded-xl text-xs font-mono font-bold text-gray-400 hover:text-white transition cursor-pointer select-none active:scale-95"
                                   >
                                     +{Math.ceil(item.target / 3)}
                                   </button>
                                   <button
                                     onClick={() => handleQuickLog(item.id, 1)}
-                                    className="px-2.5 py-1.5 bg-[#12141C] hover:bg-[#1E212E] border border-[#232734] rounded-lg text-xs font-mono font-bold text-gray-400 hover:text-white transition cursor-pointer select-none"
+                                    className="flex-1 md:flex-none px-4 py-3 min-h-[44px] flex items-center justify-center bg-[#12141C] hover:bg-[#1E212E] border border-[#232734] rounded-xl text-xs font-mono font-bold text-gray-400 hover:text-white transition cursor-pointer select-none active:scale-95"
                                   >
                                     +1
                                   </button>
                                 </div>
 
                                 {isCompleted ? (
-                                  <div className="text-black h-10 w-10 rounded-full flex items-center justify-center shadow-lg cursor-default shrink-0 bg-[#12B886] transition-all duration-300 animate-pulse" style={{ filter: 'drop-shadow(0 0 6px rgba(18, 184, 134, 0.65))' }}>
-                                    <Check className="w-4.5 h-4.5 stroke-[3px]" />
+                                  <div className="text-black h-11 w-11 rounded-full flex items-center justify-center shadow-lg cursor-default shrink-0 bg-[#12B886] transition-all duration-300 animate-pulse" style={{ filter: 'drop-shadow(0 0 6px rgba(18, 184, 134, 0.65))' }}>
+                                    <Check className="w-5 h-5 stroke-[3px]" />
                                   </div>
                                 ) : (
                                   <button
                                     onClick={() => handleQuickLog(item.id, remaining)}
-                                    className="h-10 w-10 rounded-full border-2 flex items-center justify-center transition-all duration-300 cursor-pointer shrink-0 group/circle"
+                                    className="h-11 w-11 rounded-full border-2 flex items-center justify-center transition-all duration-300 cursor-pointer shrink-0 group/circle active:scale-95"
                                     style={{
                                       borderColor: '#202434',
                                       backgroundColor: 'transparent'
@@ -817,7 +832,7 @@ export default function Dashboard({
                                       e.currentTarget.style.boxShadow = 'none';
                                     }}
                                   >
-                                    <Check className="w-4.5 h-4.5 stroke-[3px] opacity-0 group-hover/circle:opacity-100 transition-all duration-200" style={{ color: config.color }} />
+                                    <Check className="w-5 h-5 stroke-[3px] opacity-0 group-hover/circle:opacity-100 transition-all duration-200" style={{ color: config.color }} />
                                   </button>
                                 )}
                               </div>

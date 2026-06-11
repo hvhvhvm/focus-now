@@ -10,6 +10,15 @@ body {
   background-color: #0A0B0E;
   font-family: var(--font-sans);
   color-scheme: dark;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overscroll-behavior: none;
+}
+
+/* Improve tap experience on all interactive elements */
+button, a, [role="button"] {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* Custom transitions and animation presets */
@@ -18,22 +27,18 @@ body {
 }
 
 @keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 /* Custom sleek scrollbar for dashboard panels */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 4px;
+  height: 4px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0E1013;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
@@ -45,3 +50,27 @@ body {
   background: #2D3346;
 }
 
+/* Hide scrollbar on mobile filter rows while keeping scroll functionality */
+.scroll-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scroll-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Smooth page transitions */
+.page-content {
+  animation: fadeInUp 0.18s ease-out;
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

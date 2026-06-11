@@ -45,7 +45,7 @@ export default function Sidebar({ currentTab, setTab, userPoints, momentumScore,
   ];
 
   return (
-    <aside className={`border-r border-[#1E222A] bg-[#0E1013] flex flex-col justify-between h-screen sticky top-0 text-gray-300 transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-64'}`}>
+    <aside className={`hidden md:flex border-r border-[#1E222A] bg-[#0E1013] flex-col justify-between h-screen sticky top-0 text-gray-300 transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-64'}`}>
       <div className={`p-6 flex flex-col ${isCollapsed ? 'items-center px-3' : ''}`}>
         
         {/* Brand Logo & Interactive Collapse Control Header */}
