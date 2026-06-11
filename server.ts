@@ -5,7 +5,7 @@ import { createServer as createViteServer } from "vite";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || "mountain-summit-secret-token";
 const JSON_DB_PATH = path.join(process.cwd(), "mountain_habit_tracker_db.json");
 
