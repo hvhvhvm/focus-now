@@ -4,11 +4,15 @@ import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
+import { config as loadDotenv } from "dotenv";
+
+// Load .env in development (no-op if already set or file missing)
+loadDotenv();
 
 const PORT = Number(process.env.PORT) || 3000;
 const JWT_SECRET =
   process.env.JWT_SECRET ||
-  (process.env.NODE_ENV === "production" ? "" : "mountain-summit-secret-token");
+  (process.env.NODE_ENV !== "production" ? "mountain-summit-secret-token-dev" : "");
 const DATA_DIR = process.env.DATA_DIR
   ? path.resolve(process.env.DATA_DIR)
   : process.cwd();
@@ -98,7 +102,13 @@ function authenticateToken(req: AuthRequest, res: express.Response, next: expres
 
 async function startServer() {
   if (!JWT_SECRET) {
-    throw new Error("JWT_SECRET must be configured in production.");
+    console.error("\n==========================================================");
+    console.error("FATAL: JWT_SECRET environment variable is not set.");
+    console.error("ACTION: In your Render dashboard → Environment → add:");
+    console.error("  Key:   JWT_SECRET");
+    console.error("  Value: (a long random secret, e.g. run: openssl rand -hex 32)");
+    console.error("=========================================================\n");
+    process.exit(1);
   }
 
   const app = express();
