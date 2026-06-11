@@ -83,7 +83,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
         <div className="mb-6 p-3 bg-indigo-950/20 border border-indigo-900/30 rounded-xl flex items-start gap-2 text-indigo-200 text-xs leading-relaxed">
           <Shield className="w-4 h-4 text-indigo-400 mt-0.5 shrink-0" />
           <div>
-            Your habits profile is backed by <strong className="text-white font-mono">SQLite</strong> (development) / <strong className="text-white font-mono">PostgreSQL</strong> (production) with secure crypt hashing.
+            Your account is protected with secure password hashing and token-based authentication.
           </div>
         </div>
 

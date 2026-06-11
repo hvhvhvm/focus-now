@@ -6,8 +6,17 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 
 const PORT = Number(process.env.PORT) || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || "mountain-summit-secret-token";
-const JSON_DB_PATH = path.join(process.cwd(), "mountain_habit_tracker_db.json");
+const JWT_SECRET =
+  process.env.JWT_SECRET ||
+  (process.env.NODE_ENV === "production" ? "" : "mountain-summit-secret-token");
+const DATA_DIR = process.env.DATA_DIR
+  ? path.resolve(process.env.DATA_DIR)
+  : process.cwd();
+const JSON_DB_PATH = path.join(DATA_DIR, "mountain_habit_tracker_db.json");
+const configuredOrigins = (process.env.CLIENT_ORIGIN || "")
+  .split(",")
+  .map(origin => origin.trim().replace(/\/+$/, ""))
+  .filter(Boolean);
 
 // Pure JS in-memory state that persists to JSON
 interface DBState {
@@ -28,11 +37,8 @@ let dbState: DBState = {
 
 // Sync memory to file
 function saveDb() {
-  try {
-    fs.writeFileSync(JSON_DB_PATH, JSON.stringify(dbState, null, 2), "utf-8");
-  } catch (err) {
-    console.error("Failed to write to JSON db file:", err);
-  }
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(JSON_DB_PATH, JSON.stringify(dbState, null, 2), "utf-8");
 }
 
 // Initial check & load
@@ -91,13 +97,66 @@ function authenticateToken(req: AuthRequest, res: express.Response, next: expres
 }
 
 async function startServer() {
+  if (!JWT_SECRET) {
+    throw new Error("JWT_SECRET must be configured in production.");
+  }
+
   const app = express();
+  app.set("trust proxy", 1);
+
+  app.use((req, res, next) => {
+    const origin = req.headers.origin?.replace(/\/+$/, "");
+    let isSameOrigin = false;
+    if (origin) {
+      try {
+        isSameOrigin = new URL(origin).host === req.get("host");
+      } catch {
+        isSameOrigin = false;
+      }
+    }
+    const isLocalOrigin = origin
+      ? /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
+      : false;
+    const isAllowedVercelOrigin =
+      process.env.ALLOW_VERCEL_ORIGINS === "true" &&
+      Boolean(origin?.endsWith(".vercel.app"));
+    const isAllowedOrigin =
+      !origin ||
+      isSameOrigin ||
+      isLocalOrigin ||
+      configuredOrigins.includes(origin) ||
+      isAllowedVercelOrigin;
+
+    if (origin && isAllowedOrigin) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Vary", "Origin");
+      res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+    }
+
+    if (req.method === "OPTIONS") {
+      return isAllowedOrigin
+        ? res.sendStatus(204)
+        : res.status(403).json({ error: "Origin is not allowed." });
+    }
+
+    if (origin && !isAllowedOrigin) {
+      return res.status(403).json({ error: "Origin is not allowed." });
+    }
+
+    next();
+  });
+
   app.use(express.json());
 
   // Init JSON db structure
   initDb();
 
   // --- REST ENDPOINTS ---
+
+  app.get("/api/health", (_req, res) => {
+    res.json({ status: "ok" });
+  });
 
   // 1. Authentication
 

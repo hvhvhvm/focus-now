@@ -9,7 +9,7 @@ import AuthPage from './components/AuthPage';
 import { CreateHabitModal, CreateRoutineModal } from './components/Modals';
 import { Habit, Category, Routine } from './types';
 import { getInitialState, calculateMomentum, dateToday } from './data';
-import { api } from './api';
+import { api, ApiError } from './api';
 import { Sparkles, Trophy, Zap, RefreshCw, LogOut, Terminal, Layers } from 'lucide-react';
 
 export default function App() {
@@ -55,7 +55,10 @@ export default function App() {
     } catch (err: any) {
       console.error('Error loading full-stack assets:', err);
       // If unauthorized token, force session clear
-      if (err.message && (err.message.includes('401') || err.message.includes('403') || err.message.includes('expired'))) {
+      if (
+        (err instanceof ApiError && (err.status === 401 || err.status === 403)) ||
+        err.message?.toLowerCase().includes('expired')
+      ) {
         handleLogout();
       }
     } finally {

@@ -1,20 +1,73 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Focus Now
 
-# Run and deploy your AI Studio app
-
-This contains everything you need to run your app locally.
-
-View your app in AI Studio: https://ai.studio/apps/d9b52ba5-301b-403f-9895-34ae2a3ac701
+React/Vite habit tracker with an Express API.
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
+Prerequisite: Node.js 20 or newer.
 
+```powershell
+npm install
+npm run dev
+```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+Open `http://localhost:3000`. The frontend and backend run together locally.
+
+## Production Deployment
+
+The production setup uses:
+
+- Vercel for the Vite frontend.
+- Render Web Service for the Express API.
+- A Render persistent disk for `mountain_habit_tracker_db.json`.
+
+### Render Backend
+
+Create a Render Web Service from this repository:
+
+```text
+Build Command: npm ci && npm run build
+Start Command: npm start
+```
+
+Add these Render environment variables:
+
+```text
+NODE_ENV=production
+JWT_SECRET=<long-random-secret>
+CLIENT_ORIGIN=https://your-project.vercel.app
+DATA_DIR=/var/data
+```
+
+Attach a persistent disk mounted at `/var/data`. Without the disk, accounts and
+habits can disappear whenever the Render service restarts or redeploys.
+
+### Vercel Frontend
+
+Import the same repository into Vercel and configure:
+
+```text
+Framework Preset: Vite
+Build Command: npm run build:client
+Output Directory: dist
+```
+
+Add this Vercel environment variable for Production, Preview, and Development:
+
+```text
+VITE_API_BASE_URL=https://your-api-name.onrender.com/api
+```
+
+Redeploy after changing any `VITE_` environment variable because Vite embeds it
+during the build.
+
+For preview deployments, either add each preview origin to `CLIENT_ORIGIN` or
+set `ALLOW_VERCEL_ORIGINS=true` on Render.
+
+Verify the backend before testing login:
+
+```text
+https://your-api-name.onrender.com/api/health
+```
+
+It should return `{"status":"ok"}`.

@@ -1,6 +1,16 @@
 import { Habit, Routine, UserStats } from './types';
 
-const API_BASE = '/api';
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/+$/, '');
+
+export class ApiError extends Error {
+  status: number;
+
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+  }
+}
 
 function getHeaders() {
   const token = localStorage.getItem('habit_mountain_token');
@@ -25,9 +35,22 @@ export async function fetchWithAuth(url: string, options: RequestInit = {}) {
 
   const response = await fetch(`${API_BASE}${url}`, config);
   if (!response.ok) {
-    const errData = await response.json().catch(() => ({}));
-    throw new Error(errData.error || `HTTP error ${response.status}: ${response.statusText}`);
+    const contentType = response.headers.get('content-type') || '';
+    const errData = contentType.includes('application/json')
+      ? await response.json().catch(() => ({}))
+      : {};
+    const message =
+      errData.error ||
+      errData.detail ||
+      errData.message ||
+      (response.status === 404
+        ? 'The API endpoint was not found. Check VITE_API_BASE_URL in your deployment settings.'
+        : `Request failed (${response.status} ${response.statusText}).`);
+
+    throw new ApiError(message, response.status);
   }
+
+  if (response.status === 204) return null;
   return response.json();
 }
 
