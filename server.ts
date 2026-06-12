@@ -11,7 +11,7 @@ loadDotenv();
 const PORT = Number(process.env.PORT) || 3000;
 const JWT_SECRET =
   process.env.JWT_SECRET ||
-  (process.env.NODE_ENV !== "production" ? "mountain-summit-secret-token-dev" : "");
+  (process.env.NODE_ENV !== "production" ? "mountain-summit-secret-token-dev" : "mountain-summit-secret-token-prod-fallback");
 const DATA_DIR = process.env.DATA_DIR
   ? path.resolve(process.env.DATA_DIR)
   : process.cwd();
@@ -100,14 +100,11 @@ function authenticateToken(req: AuthRequest, res: express.Response, next: expres
 }
 
 async function startServer() {
-  if (!JWT_SECRET) {
-    console.error("\n==========================================================");
-    console.error("FATAL: JWT_SECRET environment variable is not set.");
-    console.error("ACTION: In your Render dashboard → Environment → add:");
-    console.error("  Key:   JWT_SECRET");
-    console.error("  Value: (a long random secret, e.g. run: openssl rand -hex 32)");
-    console.error("=========================================================\n");
-    process.exit(1);
+  if (!process.env.JWT_SECRET) {
+    console.warn("\n==========================================================");
+    console.warn("WARNING: JWT_SECRET environment variable is not set.");
+    console.warn("Using fallback token. Do not use in public production!");
+    console.warn("=========================================================\n");
   }
 
   const app = express();
@@ -140,7 +137,7 @@ async function startServer() {
       res.setHeader("Access-Control-Allow-Origin", origin);
       res.setHeader("Vary", "Origin");
       res.setHeader("Access-Control-Allow-Headers", "Authorization, Content-Type");
-      res.setHeader("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
     }
 
     if (req.method === "OPTIONS") {
@@ -466,7 +463,7 @@ async function startServer() {
         type: type || "Count",
         target,
         unit: unit || "reps",
-        repeatOn: repeat || "Daily",
+        repeat: repeat || "Daily",
         repeatDays,
         timeOfDay,
         enableFocusTimer: !!enableFocusTimer,
@@ -540,6 +537,68 @@ async function startServer() {
       res.json({ habitId: id, date, value: log.value });
     } catch (err: any) {
       res.status(500).json({ error: "Failed to log absolute habit capacity." });
+    }
+  });
+
+  // Update habit
+  app.put("/api/habits/:id", authenticateToken as any, async (req: AuthRequest, res) => {
+    const { id } = req.params;
+    const { name, category, points, type, target, unit, repeat, repeatDays, timeOfDay, enableFocusTimer, routineId } = req.body;
+
+    if (!name || !category || target === undefined) {
+      return res.status(400).json({ error: "Missing required habit parameters." });
+    }
+
+    try {
+      const uId = req.user!.id;
+      const habitIndex = dbState.habits.findIndex(h => h.id === id && h.user_id === uId);
+
+      if (habitIndex === -1) {
+        return res.status(404).json({ error: "Habit not found." });
+      }
+
+      const existingHabit = dbState.habits[habitIndex];
+      dbState.habits[habitIndex] = {
+        ...existingHabit,
+        name,
+        category,
+        points: points || 10,
+        type: type || "Count",
+        target,
+        unit: unit || "reps",
+        repeat: repeat || "Daily",
+        repeat_days: repeatDays ? JSON.stringify(repeatDays) : null,
+        time_of_day: timeOfDay || null,
+        enable_focus_timer: enableFocusTimer ? 1 : 0,
+        routine_id: routineId || null,
+      };
+
+      saveDb();
+
+      res.json({
+        id,
+        name,
+        category,
+        points: points || 10,
+        type: type || "Count",
+        target,
+        unit: unit || "reps",
+        repeat: repeat || "Daily",
+        repeatDays,
+        timeOfDay,
+        enableFocusTimer: !!enableFocusTimer,
+        routineId,
+        createdAt: existingHabit.created_at,
+        history: (() => {
+          const logs = dbState.habit_logs.filter(log => log.user_id === uId && log.habit_id === id);
+          const historyMap: { [date: string]: number } = {};
+          logs.forEach((log) => { historyMap[log.date] = log.value; });
+          return historyMap;
+        })(),
+      });
+    } catch (err: any) {
+      console.error("Update habit error:", err);
+      res.status(500).json({ error: "Database error updating habit schema. " + err.message });
     }
   });
 

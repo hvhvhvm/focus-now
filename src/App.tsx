@@ -6,12 +6,13 @@ import HabitsPage from './components/HabitsPage';
 import MomentumPage from './components/MomentumPage';
 import OnePercentBetterPage from './components/OnePercentBetterPage';
 import InsightsPage from './components/InsightsPage';
+import ProfilePage from './components/ProfilePage';
 import AuthPage from './components/AuthPage';
 import { CreateHabitModal, CreateRoutineModal } from './components/Modals';
 import { Habit, Category, Routine } from './types';
-import { getInitialState, calculateMomentum, dateToday } from './data';
+import { calculateMomentum, dateToday } from './data';
 import { api, ApiError } from './api';
-import { Sparkles, Trophy, Zap, RefreshCw, LogOut, Terminal, Layers } from 'lucide-react';
+import { Zap } from 'lucide-react';
 
 export default function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('habit_mountain_token'));
@@ -30,6 +31,7 @@ export default function App() {
   // State for Create dialogue modals
   const [isHabitModalOpen, setIsHabitModalOpen] = useState(false);
   const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false);
+  const [habitToEdit, setHabitToEdit] = useState<Habit | null>(null);
   const [deletingHabitId, setDeletingHabitId] = useState<string | null>(null);
 
   // Fetch all user details, habits, routines on mounting/authentication
@@ -195,7 +197,7 @@ export default function App() {
         category: habitData.category || 'Fitness',
         points: habitData.points || 10,
         type: habitData.type || 'Count',
-        target: habitData.target || 1,
+        target: Math.max(1, Number(habitData.target) || 1),
         unit: habitData.type === 'Timer' ? 'min' : habitData.unit || 'reps',
         repeat: habitData.repeat || 'Daily',
         timeOfDay: habitData.timeOfDay,
@@ -215,9 +217,79 @@ export default function App() {
         setRoutines(nextRoutines);
       }
 
-      setIsHabitModalOpen(false);
+      closeHabitModal();
     } catch (err: any) {
       alert('Error creating habit index: ' + err.message);
+    }
+  };
+
+  const closeHabitModal = () => {
+    setIsHabitModalOpen(false);
+    setHabitToEdit(null);
+  };
+
+  const openCreateHabit = () => {
+    setHabitToEdit(null);
+    setIsHabitModalOpen(true);
+  };
+
+  const openEditHabit = (habit: Habit) => {
+    setHabitToEdit(habit);
+    setIsHabitModalOpen(true);
+  };
+
+  const handleUpdateHabitSubmit = async (id: string, habitData: Partial<Habit>) => {
+    try {
+      const payload: Partial<Habit> = {
+        name: habitData.name || 'Untitled Habit',
+        category: habitData.category || 'Fitness',
+        points: habitData.points || 10,
+        type: habitData.type || 'Count',
+        target: Math.max(1, Number(habitData.target) || 1),
+        unit: habitData.type === 'Timer' ? 'min' : habitData.unit || 'reps',
+        repeat: habitData.repeat || 'Daily',
+        timeOfDay: habitData.timeOfDay,
+        enableFocusTimer: habitData.enableFocusTimer || false,
+        routineId: habitData.routineId,
+      };
+
+      await api.updateHabit(id, payload);
+
+      const nextHabits = await api.getHabits();
+      setHabits(nextHabits);
+
+      if (habitData.routineId) {
+        const nextRoutines = await api.getRoutines();
+        setRoutines(nextRoutines);
+      }
+
+      closeHabitModal();
+    } catch (err: any) {
+      alert('Error updating habit: ' + err.message);
+    }
+  };
+
+  const handleRevertHabit = async (id: string) => {
+    try {
+      const targetHabit = habits.find((h) => h.id === id);
+      if (!targetHabit) return;
+
+      const curToday = targetHabit.history[dateToday] || 0;
+      const wasCompleted = curToday >= targetHabit.target;
+
+      await api.logHabitAbsolute(id, dateToday, 0);
+
+      if (wasCompleted) {
+        const ptsToRemove = targetHabit.points + 5;
+        const nextPoints = Math.max(0, userPoints - ptsToRemove);
+        await api.syncJourney({ total_points: nextPoints });
+        setUserPoints(nextPoints);
+      }
+
+      const updatedHabits = await api.getHabits();
+      setHabits(updatedHabits);
+    } catch (err: any) {
+      alert('Failed to revert habit: ' + err.message);
     }
   };
 
@@ -305,7 +377,7 @@ export default function App() {
 
   // Reset database state completely
   const handleResetApp = async () => {
-    if (confirm('Are you sure you want to reset all tracked points and database logs to start fresh? This drops your sqlite metrics safely.')) {
+    if (confirm('Are you sure you want to reset all tracked points and habit logs to start fresh? This cannot be undone.')) {
       setAppLoading(true);
       try {
         await api.resetAllData();
@@ -357,19 +429,10 @@ export default function App() {
         userPoints={userPoints}
         momentumScore={currentLiveMomentumScore}
         onReset={handleResetApp}
-        currentUser={currentUser}
-        onLogout={handleLogout}
       />
 
       {/* 2. Main Content Body */}
-      <main className="flex-1 p-6 md:p-10 pb-24 md:pb-10 max-h-screen overflow-y-auto relative">
-        
-        {/* Database backend active system flag */}
-        <div className="absolute top-4 right-10 flex items-center gap-1.5 bg-[#0F111A] border border-green-900/30 px-3 py-1 rounded-full text-[10px] text-green-400 font-mono select-none z-50">
-          <span className="w-1.5 h-1.5 bg-green-500 rounded-full animate-ping" />
-          <span>FULLSTACK DATABASE_SECURE</span>
-        </div>
-
+      <main className="flex-1 p-4 md:p-10 pb-24 md:pb-10 max-h-screen overflow-y-auto relative">
         {/* Tab Routing orchestrations */}
         {currentTab === 'dashboard' && (
           <Dashboard
@@ -391,8 +454,10 @@ export default function App() {
             onLogHabit={handleLogHabit}
             onDeleteHabit={handleDeleteHabit}
             deletingHabitId={deletingHabitId}
-            openCreateHabit={() => setIsHabitModalOpen(true)}
+            openCreateHabit={openCreateHabit}
             openCreateRoutine={() => setIsRoutineModalOpen(true)}
+            onEditHabit={openEditHabit}
+            onRevertHabit={handleRevertHabit}
             selectedRoutineId={selectedRoutineId}
             setSelectedRoutineId={setSelectedRoutineId}
             selectedCategoryId={selectedCategoryId}
@@ -419,6 +484,18 @@ export default function App() {
             userPoints={userPoints}
           />
         )}
+
+        {currentTab === 'profile' && (
+          <ProfilePage
+            currentUser={currentUser}
+            userPoints={userPoints}
+            habits={habits}
+            momentumScore={currentLiveMomentumScore}
+            onLogout={handleLogout}
+            onReset={handleResetApp}
+            setTab={setTab}
+          />
+        )}
       </main>
 
       {/* Fixed bottom navigation for mobile viewports */}
@@ -429,17 +506,16 @@ export default function App() {
           setSelectedRoutineId(null);
           setSelectedCategoryId(null);
         }}
-        momentumScore={currentLiveMomentumScore}
-        currentUser={currentUser}
-        onLogout={handleLogout}
       />
 
       {/* 3. Global Control Modals */}
       <CreateHabitModal
         isOpen={isHabitModalOpen}
-        onClose={() => setIsHabitModalOpen(false)}
+        onClose={closeHabitModal}
         routines={routines}
         onCreate={handleCreateHabitSubmit}
+        onSave={handleUpdateHabitSubmit}
+        habitToEdit={habitToEdit}
       />
 
       <CreateRoutineModal

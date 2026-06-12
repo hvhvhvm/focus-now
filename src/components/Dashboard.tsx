@@ -100,9 +100,23 @@ export default function Dashboard({
     return Math.round(completedRatioSum / catHabits.length);
   };
 
-  const fitnessProgress = getCategoryStats('Fitness');
-  const readingProgress = getCategoryStats('Reading');
-  const productivityProgress = getCategoryStats('Productivity');
+  const activeCategories = React.useMemo(() => {
+    const cats = new Set<Category>();
+    habits.forEach((h) => cats.add(h.category));
+    const order: Category[] = ['Fitness', 'Reading', 'Productivity', 'Health', 'Study', 'Mindfulness', 'Social', 'Custom'];
+    return order.filter((c) => cats.has(c));
+  }, [habits]);
+
+  const categoryProgressList = activeCategories.map((cat) => ({
+    name: cat,
+    progress: getCategoryStats(cat),
+    color: getCategoryColor(cat),
+  }));
+
+  const overallCategoryAvg =
+    categoryProgressList.length > 0
+      ? Math.round(categoryProgressList.reduce((sum, c) => sum + c.progress, 0) / categoryProgressList.length)
+      : 0;
 
   const doneTodayCount = habits.filter((h) => (h.history[dateToday] || 0) >= h.target).length;
   const totalTodayCount = habits.length;
@@ -300,35 +314,37 @@ export default function Dashboard({
         </div>
       </header>
 
-      {/* Categories Grid */}
-      <div className="flex flex-wrap items-center gap-3">
-        {(['Fitness', 'Reading', 'Productivity'] as Category[]).map((cat) => {
-          const val = getCategoryStats(cat);
-          let dotColor = 'bg-[#12B886]';
-          let glowColor = 'hover:shadow-[0_0_12px_rgba(18,184,134,0.25)] hover:border-[#12B886]/40';
-          if (cat === 'Reading') {
-            dotColor = 'bg-[#845EF7]'; // Violet/purple
-            glowColor = 'hover:shadow-[0_0_12px_rgba(132,94,247,0.25)] hover:border-[#845EF7]/40';
-          }
-          if (cat === 'Productivity') {
-            dotColor = 'bg-[#FCC419]'; // Amber yellow
-            glowColor = 'hover:shadow-[0_0_12px_rgba(252,196,25,0.25)] hover:border-[#FCC419]/40';
-          }
-          return (
-            <div
-              key={cat}
-              className={`flex items-center space-x-2 bg-[#12141C] border border-[#232734] px-4 py-2 rounded-full text-xs text-gray-300 cursor-pointer hover:bg-[#1E212E] transition-all duration-300 ${glowColor}`}
-              onClick={() => setSelectedCategoryId(cat)}
-            >
-              <span className={`w-2.5 h-2.5 rounded-full ${dotColor} animate-pulse`} />
-              <span className="font-semibold text-gray-250">{cat}</span>
-              <span className="text-[10px] font-mono text-gray-400 font-bold bg-[#1A1D28] rounded px-1.5 py-0.5">
-                {val}%
-              </span>
-            </div>
-          );
-        })}
-      </div>
+      {/* Active category pills */}
+      {activeCategories.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 md:gap-3">
+          {activeCategories.map((cat) => {
+            const val = getCategoryStats(cat);
+            const color = getCategoryColor(cat);
+            return (
+              <div
+                key={cat}
+                className="flex items-center space-x-2 bg-[#12141C] border border-[#232734] px-3 md:px-4 py-2 rounded-full text-xs text-gray-300 cursor-pointer hover:bg-[#1E212E] transition-all duration-300"
+                style={{ boxShadow: 'none' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = `${color}66`;
+                  e.currentTarget.style.boxShadow = `0 0 12px ${color}33`;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = '#232734';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+                onClick={() => setSelectedCategoryId(cat)}
+              >
+                <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: color }} />
+                <span className="font-semibold text-gray-250">{cat}</span>
+                <span className="text-[10px] font-mono text-gray-400 font-bold bg-[#1A1D28] rounded px-1.5 py-0.5">
+                  {val}%
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* 2. Primary Metrics: Progress, Points, Momentum, and Compounding Index */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
@@ -877,34 +893,45 @@ export default function Dashboard({
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-mono tracking-wider text-gray-500">CATEGORIES BREAKDOWN</span>
               <span className="text-lg font-bold text-white font-mono">
-                {Math.round((fitnessProgress + readingProgress + productivityProgress) / 3)}%
+                {overallCategoryAvg}%
               </span>
             </div>
             <h3 className="text-base font-bold text-white mt-1 text-left">Category Progress</h3>
+            <p className="text-[10px] text-gray-500 mt-0.5">
+              {activeCategories.length} active {activeCategories.length === 1 ? 'category' : 'categories'}
+            </p>
           </div>
 
           <div className="my-6">
-            <div className="grid grid-cols-3 gap-4">
-              {[
-                { name: 'Fitness', progress: fitnessProgress, color: 'bg-[#12B886]', text: 'text-[#12B886]' },
-                { name: 'Reading', progress: readingProgress, color: 'bg-[#FD7E14]', text: 'text-[#FD7E14]' },
-                { name: 'Productivity', progress: productivityProgress, color: 'bg-[#FCC419]', text: 'text-[#FCC419]' },
-              ].map((item) => (
-                <div key={item.name} className="flex flex-col items-center">
-                  <div 
-                    onClick={() => setSelectedCategoryId(item.name as Category)}
-                    className="w-full h-24 bg-gray-900 rounded-lg relative overflow-hidden flex items-end cursor-pointer hover:bg-[#1A1C27] border border-gray-800 transition"
-                  >
+            {categoryProgressList.length > 0 ? (
+              <div className={`grid gap-3 md:gap-4 ${
+                categoryProgressList.length <= 3
+                  ? 'grid-cols-3'
+                  : categoryProgressList.length <= 4
+                    ? 'grid-cols-2 sm:grid-cols-4'
+                    : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
+              }`}>
+                {categoryProgressList.map((item) => (
+                  <div key={item.name} className="flex flex-col items-center">
                     <div
-                      className={`w-full ${item.color} rounded-t transition-all duration-500`}
-                      style={{ height: `${item.progress}%` }}
-                    />
+                      onClick={() => setSelectedCategoryId(item.name)}
+                      className="w-full h-20 md:h-24 bg-gray-900 rounded-lg relative overflow-hidden flex items-end cursor-pointer hover:bg-[#1A1C27] border border-gray-800 transition"
+                    >
+                      <div
+                        className="w-full rounded-t transition-all duration-500"
+                        style={{ height: `${item.progress}%`, backgroundColor: item.color }}
+                      />
+                    </div>
+                    <span className="text-xs font-semibold text-gray-300 mt-2 text-center">{item.name}</span>
+                    <span className="text-[10px] font-mono text-gray-500 mt-0.5">{item.progress}%</span>
                   </div>
-                  <span className="text-xs font-semibold text-gray-300 mt-2">{item.name}</span>
-                  <span className="text-[10px] font-mono text-gray-500 mt-0.5">{item.progress}%</span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500 text-xs">
+                No habits yet. Create habits to see category progress.
+              </div>
+            )}
           </div>
 
           <div className="flex items-start space-x-2 bg-gray-950/20 border border-gray-800/40 rounded-xl p-3 text-left">

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Zap, Clock, Sparkles, Clipboard, Plus, ShieldCheck } from 'lucide-react';
 import { Category, Habit, HabitType, Routine } from '../types';
 import { motion } from 'motion/react';
@@ -7,20 +7,74 @@ interface CreateHabitModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCreate: (habitData: Partial<Habit>) => void;
+  onSave?: (id: string, habitData: Partial<Habit>) => void;
+  habitToEdit?: Habit | null;
   routines: Routine[];
 }
 
-export function CreateHabitModal({ isOpen, onClose, onCreate, routines }: CreateHabitModalProps) {
+export function CreateHabitModal({ isOpen, onClose, onCreate, onSave, habitToEdit, routines }: CreateHabitModalProps) {
   const [name, setName] = useState('');
   const [category, setCategory] = useState<Category>('Fitness');
   const [points, setPoints] = useState(10);
   const [type, setType] = useState<HabitType>('Count');
-  const [target, setTarget] = useState(1);
+  const [target, setTarget] = useState<number | string>('');
   const [unit, setUnit] = useState('reps');
   const [repeat, setRepeat] = useState<'Daily' | 'Custom Days' | 'Today Only'>('Daily');
-  const [timeOfDay, setTimeOfDay] = useState('');
+  const [timeBlock, setTimeBlock] = useState<'' | 'Morning' | 'Evening' | 'Night'>('');
   const [enableFocusTimer, setEnableFocusTimer] = useState(false);
   const [routineId, setRoutineId] = useState('');
+
+  useEffect(() => {
+    if (habitToEdit) {
+      setName(habitToEdit.name || '');
+      setCategory(habitToEdit.category || 'Fitness');
+      setPoints(habitToEdit.points || 10);
+      setType(habitToEdit.type || 'Count');
+      setTarget(habitToEdit.target ?? '');
+      setUnit(habitToEdit.unit || 'reps');
+      setRepeat(habitToEdit.repeat || 'Daily');
+      const tod = habitToEdit.timeOfDay || '';
+      if (tod === 'Morning' || tod === 'Evening' || tod === 'Night') {
+        setTimeBlock(tod);
+      } else if (tod.toLowerCase().includes('morning')) {
+        setTimeBlock('Morning');
+      } else if (tod.toLowerCase().includes('evening') || tod.toLowerCase().includes('afternoon')) {
+        setTimeBlock('Evening');
+      } else if (tod.toLowerCase().includes('night')) {
+        setTimeBlock('Night');
+      } else {
+        setTimeBlock('');
+      }
+      setEnableFocusTimer(!!habitToEdit.enableFocusTimer);
+      setRoutineId(habitToEdit.routineId || '');
+    } else {
+      setName('');
+      setCategory('Fitness');
+      setPoints(10);
+      setType('Count');
+      setTarget('');
+      setUnit('reps');
+      setRepeat('Daily');
+      setTimeBlock('');
+      setEnableFocusTimer(false);
+      setRoutineId('');
+    }
+  }, [habitToEdit, isOpen]);
+
+  const timeBlocks: { id: '' | 'Morning' | 'Evening' | 'Night'; label: string; icon: string }[] = [
+    { id: '', label: 'Anytime', icon: '🔄' },
+    { id: 'Morning', label: 'Morning', icon: '☀️' },
+    { id: 'Evening', label: 'Evening', icon: '🌇' },
+    { id: 'Night', label: 'Night', icon: '🌙' },
+  ];
+
+  const getDefaultTarget = (habitType: HabitType) => (habitType === 'Timer' ? 30 : 10);
+
+  const resolvedTarget = () => {
+    const parsed = Number(target);
+    if (target !== '' && !Number.isNaN(parsed) && parsed >= 1) return parsed;
+    return getDefaultTarget(type);
+  };
 
   const categories: { id: Category; label: string; icon: string; color: string; activeClass: string }[] = [
     { id: 'Health', label: 'Health', icon: '❤️', color: 'text-rose-400', activeClass: 'border-rose-500 bg-rose-500/10 text-rose-400 ring-2 ring-rose-500/5' },
@@ -39,55 +93,66 @@ export function CreateHabitModal({ isOpen, onClose, onCreate, routines }: Create
     e.preventDefault();
     if (!name.trim()) return;
 
-    onCreate({
+    const finalTarget = resolvedTarget();
+
+    const payload: Partial<Habit> = {
       name,
       category,
       points,
       type,
-      target: Number(target),
+      target: finalTarget,
       unit: type === 'Timer' ? 'min' : unit || 'reps',
       repeat,
-      timeOfDay: timeOfDay || undefined,
+      timeOfDay: timeBlock || undefined,
       enableFocusTimer,
       routineId: routineId || undefined,
-    });
-    
-    // Reset properties to default state
-    setName('');
-    setCategory('Fitness');
-    setPoints(10);
-    setType('Count');
-    setTarget(1);
-    setUnit('reps');
-    setRepeat('Daily');
-    setTimeOfDay('');
-    setEnableFocusTimer(false);
-    setRoutineId('');
+    };
+
+    if (habitToEdit && onSave) {
+      onSave(habitToEdit.id, payload);
+    } else {
+      onCreate(payload);
+    }
+
+    // Reset properties to default state if not editing
+    if (!habitToEdit) {
+      setName('');
+      setCategory('Fitness');
+      setPoints(10);
+      setType('Count');
+      setTarget('');
+      setUnit('reps');
+      setRepeat('Daily');
+      setTimeBlock('');
+      setEnableFocusTimer(false);
+      setRoutineId('');
+    }
   };
 
   const pointPresets = [5, 10, 15, 25, 50];
+  const displayTarget = target === '' ? '' : target;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/85 backdrop-blur-sm md:p-4 overflow-hidden">
       <motion.div
-        initial={{ opacity: 0, scale: 0.94 }}
-        animate={{ opacity: 1, scale: 1 }}
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-        className="relative w-full max-w-md bg-[#0C0E14] border border-[#232734] rounded-2xl shadow-2xl p-4 md:p-5 overflow-hidden text-left font-sans"
+        className="relative w-full h-[100dvh] md:h-auto md:max-w-md md:max-h-[92vh] bg-[#0C0E14] border-0 md:border border-[#232734] rounded-none md:rounded-2xl shadow-2xl p-4 md:p-5 flex flex-col overflow-hidden text-left font-sans"
       >
         
         {/* Subtle background glow */}
         <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/5 rounded-bl-full blur-2xl pointer-events-none" />
 
         {/* Header (More compact) */}
-        <div className="flex items-center justify-between pb-3 border-b border-[#1A1E29] relative z-10">
+        <div className="flex items-center justify-between pb-3 border-b border-[#1A1E29] relative z-10 shrink-0">
           <div>
             <span className="text-[9px] font-mono font-bold tracking-widest text-[#12B886] uppercase">
               HABIT CONSTRUCTOR
             </span>
             <h3 className="text-lg font-extrabold text-white font-sans mt-0.5 flex items-center">
               <Sparkles className="w-4 h-4 text-purple-400 mr-2 animate-pulse" />
-              Create New Habit
+              {habitToEdit ? 'Edit Habit' : 'Create New Habit'}
             </h3>
           </div>
           <button 
@@ -99,7 +164,7 @@ export function CreateHabitModal({ isOpen, onClose, onCreate, routines }: Create
         </div>
 
         {/* Form Body (Sleek layout with smaller elements) */}
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4 relative z-10">
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4 relative z-10 overflow-y-auto pr-1 flex-1 min-h-0 pb-safe">
           
           {/* Habit Title */}
           <div>
@@ -155,6 +220,7 @@ export function CreateHabitModal({ isOpen, onClose, onCreate, routines }: Create
                   onClick={() => {
                     setType('Count');
                     setUnit('reps');
+                    if (target === '') setTarget('');
                   }}
                   className={`flex-1 text-center py-1.5 text-[10px] font-bold rounded-lg cursor-pointer transition ${
                     type === 'Count'
@@ -169,6 +235,7 @@ export function CreateHabitModal({ isOpen, onClose, onCreate, routines }: Create
                   onClick={() => {
                     setType('Timer');
                     setUnit('min');
+                    if (target === '') setTarget('');
                   }}
                   className={`flex-1 text-center py-1.5 text-[10px] font-bold rounded-lg cursor-pointer transition ${
                     type === 'Timer'
@@ -244,7 +311,7 @@ export function CreateHabitModal({ isOpen, onClose, onCreate, routines }: Create
               <div className="flex items-center space-x-1 bg-[#13151D] border border-[#252A39] rounded-xl px-2 py-1">
                 <button
                   type="button"
-                  onClick={() => setTarget(Math.max(1, target - 1))}
+                  onClick={() => setTarget(Math.max(1, (Number(target) || 1) - 1))}
                   className="w-6 h-6 rounded-lg bg-[#242A38] border border-[#3E4962] text-white text-xs font-bold flex items-center justify-center shrink-0 cursor-pointer"
                 >
                   -
@@ -252,13 +319,23 @@ export function CreateHabitModal({ isOpen, onClose, onCreate, routines }: Create
                 <input
                   type="number"
                   min="1"
-                  value={target}
-                  onChange={(e) => setTarget(Math.max(1, Number(e.target.value)))}
-                  className="w-full bg-transparent border-0 text-center text-white focus:outline-none focus:ring-0 font-bold font-mono text-xs p-0"
+                  value={displayTarget}
+                  placeholder={String(getDefaultTarget(type))}
+                  onChange={(e) => setTarget(e.target.value)}
+                  onBlur={() => {
+                    if (target === '') return;
+                    const parsed = Number(target);
+                    if (!Number.isNaN(parsed) && parsed >= 1) {
+                      setTarget(parsed);
+                    } else {
+                      setTarget('');
+                    }
+                  }}
+                  className="w-full bg-transparent border-0 text-center text-white placeholder-gray-600 focus:outline-none focus:ring-0 font-bold font-mono text-xs p-0"
                 />
                 <button
                   type="button"
-                  onClick={() => setTarget(target + 1)}
+                  onClick={() => setTarget((Number(target) || 1) + 1)}
                   className="w-6 h-6 rounded-lg bg-[#242A38] border border-[#3E4962] text-white text-xs font-bold flex items-center justify-center shrink-0 cursor-pointer"
                 >
                   +
@@ -281,37 +358,50 @@ export function CreateHabitModal({ isOpen, onClose, onCreate, routines }: Create
             </div>
           </div>
 
-          {/* Dynamic contextual config rows */}
-          <div className="grid grid-cols-2 gap-3.5">
-            <div>
-              <label className="block text-[10px] font-mono font-bold tracking-wider text-gray-400 uppercase mb-1 flex items-center">
-                <Clock className="w-3 h-3 mr-1 text-gray-500" />
-                TimeOfDay (Optional)
-              </label>
-              <input
-                type="time"
-                value={timeOfDay}
-                onChange={(e) => setTimeOfDay(e.target.value)}
-                className="w-full bg-[#13151D] border border-[#252A39] rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-purple-500"
-              />
+          {/* Time block (optional) */}
+          <div>
+            <label className="block text-[10px] font-mono font-bold tracking-wider text-gray-400 uppercase mb-1.5 flex items-center">
+              <Clock className="w-3 h-3 mr-1 text-gray-500" />
+              Time Block (Optional)
+            </label>
+            <div className="grid grid-cols-4 gap-1.5">
+              {timeBlocks.map((blk) => {
+                const isActive = timeBlock === blk.id;
+                return (
+                  <button
+                    key={blk.id || 'anytime'}
+                    type="button"
+                    onClick={() => setTimeBlock(blk.id)}
+                    className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl border text-[9px] font-bold cursor-pointer transition ${
+                      isActive
+                        ? 'border-[#12B886] bg-[#12B886]/10 text-white'
+                        : 'border-[#1C1F2B] bg-[#12141A]/60 text-gray-450 hover:text-white hover:bg-[#1A1D27]'
+                    }`}
+                  >
+                    <span className="text-sm mb-0.5">{blk.icon}</span>
+                    <span>{blk.label}</span>
+                  </button>
+                );
+              })}
             </div>
+          </div>
 
-            <div>
-              <label className="block text-[10px] font-mono font-bold tracking-wider text-gray-400 uppercase mb-1 flex items-center">
-                <Clipboard className="w-3 h-3 mr-1 text-gray-500" />
-                Link Routine (Optional)
-              </label>
-              <select
-                value={routineId}
-                onChange={(e) => setRoutineId(e.target.value)}
-                className="w-full bg-[#13151D] border border-[#252A39] rounded-xl px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-purple-500 font-sans"
-              >
-                <option value="">None (Independent)</option>
-                {routines.map((r) => (
-                  <option key={r.id} value={r.id}>{r.name}</option>
-                ))}
-              </select>
-            </div>
+          {/* Link routine (optional) */}
+          <div>
+            <label className="block text-[10px] font-mono font-bold tracking-wider text-gray-400 uppercase mb-1 flex items-center">
+              <Clipboard className="w-3 h-3 mr-1 text-gray-500" />
+              Link Routine (Optional)
+            </label>
+            <select
+              value={routineId}
+              onChange={(e) => setRoutineId(e.target.value)}
+              className="w-full bg-[#13151D] border border-[#252A39] rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-purple-500 font-sans"
+            >
+              <option value="">None (Independent)</option>
+              {routines.map((r) => (
+                <option key={r.id} value={r.id}>{r.name}</option>
+              ))}
+            </select>
           </div>
 
           {/* Pomodoro slider box (Snug layout) */}
@@ -334,19 +424,19 @@ export function CreateHabitModal({ isOpen, onClose, onCreate, routines }: Create
           </div>
 
           {/* Footer controls button */}
-          <div className="flex space-x-2.5 pt-3 border-t border-[#1A1E29]">
+          <div className="flex space-x-2.5 pt-3 border-t border-[#1A1E29] shrink-0 sticky bottom-0 bg-[#0C0E14]">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-[#151722] hover:bg-[#1E2131] border border-[#252C3E] text-[11px] font-bold text-gray-400 hover:text-white py-2 rounded-xl transition cursor-pointer"
+              className="flex-1 bg-[#151722] hover:bg-[#1E2131] border border-[#252C3E] text-[11px] font-bold text-gray-400 hover:text-white py-2.5 rounded-xl transition cursor-pointer min-h-[44px]"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-450 hover:to-teal-450 text-[11px] font-extrabold text-[#0B0F19] py-2 rounded-xl transition cursor-pointer shadow-md uppercase tracking-wider"
+              className="flex-1 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-[11px] font-extrabold text-[#0B0F19] py-2.5 rounded-xl transition cursor-pointer shadow-md uppercase tracking-wider min-h-[44px]"
             >
-              Construct Habit
+              {habitToEdit ? 'Save Changes' : 'Construct Habit'}
             </button>
           </div>
         </form>
@@ -417,19 +507,19 @@ export function CreateRoutineModal({ isOpen, onClose, onCreate }: CreateRoutineM
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-sm p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/85 backdrop-blur-sm md:p-4 overflow-hidden">
       <motion.div
-        initial={{ opacity: 0, scale: 0.94 }}
-        animate={{ opacity: 1, scale: 1 }}
+        initial={{ opacity: 0, y: 24 }}
+        animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-        className="relative w-full max-w-md bg-[#0C0E14] border border-[#232734] rounded-2xl shadow-2xl p-4 md:p-5 overflow-hidden text-left font-sans"
+        className="relative w-full h-[100dvh] md:h-auto md:max-w-md md:max-h-[92vh] bg-[#0C0E14] border-0 md:border border-[#232734] rounded-none md:rounded-2xl shadow-2xl p-4 md:p-5 flex flex-col overflow-hidden text-left font-sans"
       >
         
         {/* Subtle top decoration light */}
         <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/5 rounded-bl-full blur-2xl pointer-events-none" />
         
         {/* Modal Header */}
-        <div className="flex items-center justify-between pb-3 border-b border-[#1A1E29]">
+        <div className="flex items-center justify-between pb-3 border-b border-[#1A1E29] shrink-0">
           <div>
             <span className="text-[9px] font-mono font-bold tracking-widest text-[#B197FC] uppercase">
               ROUTINE ARCHITECT
@@ -448,7 +538,7 @@ export function CreateRoutineModal({ isOpen, onClose, onCreate }: CreateRoutineM
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4 overflow-y-auto flex-1 min-h-0 pr-1">
           
           {/* Main Title Input (Very slim profile) */}
           <div className="flex items-center space-x-2.5">
@@ -586,17 +676,17 @@ export function CreateRoutineModal({ isOpen, onClose, onCreate }: CreateRoutineM
           </div>
 
           {/* Footer controls button */}
-          <div className="flex space-x-2.5 pt-3 border-t border-[#1A1E29]">
+          <div className="flex space-x-2.5 pt-3 border-t border-[#1A1E29] shrink-0 sticky bottom-0 bg-[#0C0E14]">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 bg-[#151722]/85 hover:bg-[#1E2131] border border-[#252C3E] text-[11px] font-bold text-gray-400 hover:text-white py-2 rounded-xl transition cursor-pointer"
+              className="flex-1 bg-[#151722]/85 hover:bg-[#1E2131] border border-[#252C3E] text-[11px] font-bold text-gray-400 hover:text-white py-2.5 rounded-xl transition cursor-pointer min-h-[44px]"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 bg-gradient-to-r from-purple-500 to-indigo-505 hover:from-purple-450 hover:to-indigo-450 text-[11px] font-extrabold text-white py-2 rounded-xl transition cursor-pointer shadow-md uppercase tracking-wider"
+              className="flex-1 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-[11px] font-extrabold text-white py-2.5 rounded-xl transition cursor-pointer shadow-md uppercase tracking-wider min-h-[44px]"
             >
               Build Routine ({habitLines.filter(h => h.trim() !== '').length})
             </button>

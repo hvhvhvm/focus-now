@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Zap, Clock, Repeat, Flame, Plus, Check, Play, Pause, RotateCcw, 
-  ChevronLeft, ChevronRight, Calendar, ArrowLeft, MoreVertical, Trash2,
-  Dumbbell, BookOpen, Heart, Brain, Navigation, Sparkles, AlertCircle
+  Zap, Clock, Repeat, Plus, Check, Play, Pause, RotateCcw, 
+  ChevronLeft, MoreVertical, Trash2, Pencil, Undo2,
+  Dumbbell, BookOpen, Heart, Brain, Navigation, Sparkles
 } from 'lucide-react';
 import { Habit, Category, Routine } from '../types';
 import { dateToday } from '../data';
@@ -130,6 +130,8 @@ interface HabitsPageProps {
   deletingHabitId: string | null;
   openCreateHabit: () => void;
   openCreateRoutine: () => void;
+  onEditHabit: (habit: Habit) => void;
+  onRevertHabit: (id: string) => void;
   // Navigation inside routine detail
   selectedRoutineId: string | null;
   setSelectedRoutineId: (id: string | null) => void;
@@ -146,6 +148,8 @@ export default function HabitsPage({
   deletingHabitId,
   openCreateHabit,
   openCreateRoutine,
+  onEditHabit,
+  onRevertHabit,
   selectedRoutineId,
   setSelectedRoutineId,
   selectedCategoryId,
@@ -155,6 +159,7 @@ export default function HabitsPage({
   const [selectedFilter, setSelectedFilter] = useState<'active' | 'completed'>('active');
   const [selectedCategory, setSelectedCategory] = useState<Category | 'All'>('All');
   const [expandedHabitId, setExpandedHabitId] = useState<string | null>(null);
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null);
 
   // Input states for customized logs
   const [customLogs, setCustomLogs] = useState<{ [key: string]: string }>({});
@@ -372,9 +377,18 @@ export default function HabitsPage({
                           </button>
                         </>
                       ) : (
-                        <span className="text-emerald-400 text-xs font-semibold flex items-center pr-2">
-                          <Check className="w-4 h-4 mr-1 stroke-[3px]" /> Completed
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => onRevertHabit(item.id)}
+                            className="bg-amber-500/10 hover:bg-amber-500/15 border border-amber-500/25 text-xs font-bold text-amber-400 px-3 py-2 rounded-lg cursor-pointer transition flex items-center gap-1"
+                          >
+                            <Undo2 className="w-3.5 h-3.5" />
+                            Revert
+                          </button>
+                          <span className="text-emerald-400 text-xs font-semibold flex items-center">
+                            <Check className="w-4 h-4 mr-1 stroke-[3px]" /> Done
+                          </span>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -558,32 +572,82 @@ export default function HabitsPage({
                                 {item.name}
                               </h4>
 
-                              <div className="flex items-center space-x-1 shrink-0">
-                                {/* Toggle Options dots to trigger inline timers manual custom values */}
+                              <div className="flex items-center space-x-1 shrink-0 relative">
                                 <button
                                   type="button"
-                                  onClick={() => setExpandedHabitId(isExpanded ? null : item.id)}
-                                  title="Adjust timers or configure"
-                                  className={`text-gray-500 group-hover:text-gray-300 p-1 rounded-lg hover:bg-[#1C1F2B] transition ${isExpanded ? 'bg-gray-800 text-white' : ''}`}
+                                  onClick={() => {
+                                    setMenuOpenId(menuOpenId === item.id ? null : item.id);
+                                    setExpandedHabitId(null);
+                                  }}
+                                  title="More options"
+                                  className={`text-gray-500 group-hover:text-gray-300 p-1.5 rounded-lg hover:bg-[#1C1F2B] transition min-h-[32px] min-w-[32px] flex items-center justify-center ${menuOpenId === item.id ? 'bg-gray-800 text-white' : ''}`}
                                 >
-                                  <MoreVertical className="w-3.5 h-3.5" />
+                                  <MoreVertical className="w-4 h-4" />
                                 </button>
 
-                                {/* Direct delete option */}
-                                <button
-                                  type="button"
-                                  onClick={() => onDeleteHabit(item.id)}
-                                  disabled={deletingHabitId !== null}
-                                  title="Delete Habit"
-                                  className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 hover:text-red-400 px-2 py-1 rounded-lg border border-gray-800 hover:border-red-500/30 hover:bg-red-500/10 transition cursor-pointer disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                  {deletingHabitId === item.id ? (
-                                    <RotateCcw className="w-3.5 h-3.5 animate-spin" />
-                                  ) : (
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  )}
-                                  <span>{deletingHabitId === item.id ? 'Deleting' : 'Delete'}</span>
-                                </button>
+                                {menuOpenId === item.id && (
+                                  <>
+                                    <div
+                                      className="fixed inset-0 z-40"
+                                      onClick={() => setMenuOpenId(null)}
+                                    />
+                                    <div className="absolute right-0 top-full mt-1 w-44 bg-[#1A1D27] border border-[#2A3040] rounded-xl shadow-2xl z-50 overflow-hidden py-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setMenuOpenId(null);
+                                          onEditHabit(item);
+                                        }}
+                                        className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-semibold text-gray-300 hover:bg-[#242938] hover:text-white transition cursor-pointer"
+                                      >
+                                        <Pencil className="w-3.5 h-3.5 text-purple-400" />
+                                        Edit Habit
+                                      </button>
+                                      {item.enableFocusTimer && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setMenuOpenId(null);
+                                            setExpandedHabitId(isExpanded ? null : item.id);
+                                          }}
+                                          className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-semibold text-gray-300 hover:bg-[#242938] hover:text-white transition cursor-pointer"
+                                        >
+                                          <Clock className="w-3.5 h-3.5 text-[#12B886]" />
+                                          Focus Timer
+                                        </button>
+                                      )}
+                                      {isCompleted && (
+                                        <button
+                                          type="button"
+                                          onClick={() => {
+                                            setMenuOpenId(null);
+                                            onRevertHabit(item.id);
+                                          }}
+                                          className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-semibold text-amber-400 hover:bg-amber-500/10 transition cursor-pointer"
+                                        >
+                                          <Undo2 className="w-3.5 h-3.5" />
+                                          Revert to Active
+                                        </button>
+                                      )}
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          setMenuOpenId(null);
+                                          onDeleteHabit(item.id);
+                                        }}
+                                        disabled={deletingHabitId !== null}
+                                        className="w-full flex items-center gap-2 px-3 py-2.5 text-xs font-semibold text-red-400 hover:bg-red-500/10 transition cursor-pointer disabled:opacity-50"
+                                      >
+                                        {deletingHabitId === item.id ? (
+                                          <RotateCcw className="w-3.5 h-3.5 animate-spin" />
+                                        ) : (
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        )}
+                                        Delete Habit
+                                      </button>
+                                    </div>
+                                  </>
+                                )}
                               </div>
                             </div>
 
@@ -648,9 +712,19 @@ export default function HabitsPage({
                           {/* Action Button: Finish/Complete Habit */}
                           <div className="mt-3 relative z-10">
                             {isCompleted ? (
-                              <div className="w-full bg-[#12B886]/10 border border-[#12B886]/30 text-[#12B886] py-3 min-h-[44px] px-3 rounded-xl text-xs font-bold text-center flex items-center justify-center space-x-1.5 select-none hover:bg-[#12B886]/15 transition duration-150">
-                                <Check className="w-4 h-4 stroke-[3px]" />
-                                <span>Done for Today! 🎉</span>
+                              <div className="space-y-2">
+                                <div className="w-full bg-[#12B886]/10 border border-[#12B886]/30 text-[#12B886] py-3 min-h-[44px] px-3 rounded-xl text-xs font-bold text-center flex items-center justify-center space-x-1.5 select-none">
+                                  <Check className="w-4 h-4 stroke-[3px]" />
+                                  <span>Done for Today!</span>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => onRevertHabit(item.id)}
+                                  className="w-full bg-amber-500/10 hover:bg-amber-500/15 border border-amber-500/25 text-amber-400 py-2.5 min-h-[40px] px-3 rounded-xl text-xs font-bold cursor-pointer transition flex items-center justify-center gap-1.5 active:scale-95"
+                                >
+                                  <Undo2 className="w-3.5 h-3.5" />
+                                  Revert to Active
+                                </button>
                               </div>
                             ) : (
                               <button

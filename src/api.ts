@@ -116,6 +116,13 @@ export const api = {
     });
   },
 
+  async updateHabit(habitId: string, habitData: Partial<Habit>): Promise<Habit> {
+    return fetchWithAuth(`/habits/${habitId}`, {
+      method: 'PUT',
+      body: JSON.stringify(habitData),
+    });
+  },
+
   async deleteHabit(habitId: string) {
     return fetchWithAuth(`/habits/${habitId}`, { method: 'DELETE' });
   },

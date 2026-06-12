@@ -4,17 +4,12 @@ import {
   CheckSquare,
   Activity,
   TrendingUp,
-  BarChart3,
-  LogOut,
-  User
+  User,
 } from 'lucide-react';
 
 interface BottomNavProps {
   currentTab: string;
   setTab: (tab: string) => void;
-  momentumScore: number;
-  currentUser?: any;
-  onLogout?: () => void;
 }
 
 const navItems = [
@@ -22,15 +17,12 @@ const navItems = [
   { id: 'habits', label: 'Habits', icon: CheckSquare },
   { id: 'momentum', label: 'Momentum', icon: Activity },
   { id: '1%better', label: '1% Better', icon: TrendingUp },
-  { id: 'insights', label: 'Insights', icon: BarChart3 },
+  { id: 'profile', label: 'Profile', icon: User },
 ];
 
 export default function BottomNav({
   currentTab,
   setTab,
-  momentumScore,
-  currentUser,
-  onLogout,
 }: BottomNavProps) {
   return (
     <nav
@@ -77,23 +69,6 @@ export default function BottomNav({
               </button>
             );
           })}
-
-          {/* User/logout slot — compact avatar */}
-          {onLogout && (
-            <button
-              id="bottom-nav-logout"
-              onClick={onLogout}
-              className="flex-1 flex flex-col items-center justify-center gap-0.5 min-h-[44px] text-gray-500 hover:text-[#FA5252] transition-all duration-200 cursor-pointer select-none active:scale-95"
-              aria-label="Sign out"
-            >
-              <div className="w-5 h-5 rounded-md bg-[#12B886]/10 border border-[#12B886]/20 flex items-center justify-center text-[#12B886] text-[9px] font-mono font-black leading-none">
-                {currentUser?.email?.substring(0, 2).toUpperCase() || 'US'}
-              </div>
-              <span className="text-[10px] font-semibold font-sans opacity-60 leading-none">
-                Out
-              </span>
-            </button>
-          )}
         </div>
       </div>
     </nav>
