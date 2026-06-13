@@ -12,10 +12,22 @@ const PORT = Number(process.env.PORT) || 3000;
 const JWT_SECRET =
   process.env.JWT_SECRET ||
   (process.env.NODE_ENV !== "production" ? "mountain-summit-secret-token-dev" : "mountain-summit-secret-token-prod-fallback");
-const DATA_DIR = process.env.DATA_DIR
-  ? path.resolve(process.env.DATA_DIR)
-  : process.cwd();
+
+function resolveDataDir(): string {
+  if (process.env.DATA_DIR) {
+    return path.resolve(process.env.DATA_DIR);
+  }
+  // Render persistent disks are commonly mounted at /var/data
+  if (process.env.NODE_ENV === "production" && fs.existsSync("/var/data")) {
+    console.log("[db] Auto-detected Render persistent disk at /var/data");
+    return "/var/data";
+  }
+  return path.join(process.cwd(), "data");
+}
+
+const DATA_DIR = resolveDataDir();
 const JSON_DB_PATH = path.join(DATA_DIR, "mountain_habit_tracker_db.json");
+const LEGACY_DB_PATH = path.join(process.cwd(), "mountain_habit_tracker_db.json");
 const configuredOrigins = (process.env.CLIENT_ORIGIN || "")
   .split(",")
   .map(origin => origin.trim().replace(/\/+$/, ""))
@@ -38,40 +50,252 @@ let dbState: DBState = {
   routine_logs: []
 };
 
-// Sync memory to file
-function saveDb() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  fs.writeFileSync(JSON_DB_PATH, JSON.stringify(dbState, null, 2), "utf-8");
+let dbLoadError: string | null = null;
+let dbLastSavedAt: string | null = null;
+
+function emptyDbState(): DBState {
+  return {
+    users: [],
+    habits: [],
+    habit_logs: [],
+    routines: [],
+    routine_logs: []
+  };
 }
 
-// Initial check & load
-function initDb() {
-  if (fs.existsSync(JSON_DB_PATH)) {
-    try {
-      const data = fs.readFileSync(JSON_DB_PATH, "utf-8");
-      const parsed = JSON.parse(data);
-      dbState = {
-        users: parsed.users || [],
-        habits: parsed.habits || [],
-        habit_logs: parsed.habit_logs || [],
-        routines: parsed.routines || [],
-        routine_logs: parsed.routine_logs || []
-      };
-      console.log("JSON Database loaded successfully with state counts:", {
-        users: dbState.users.length,
-        habits: dbState.habits.length,
-        habit_logs: dbState.habit_logs.length,
-        routines: dbState.routines.length,
-        routine_logs: dbState.routine_logs.length
-      });
-    } catch (err) {
-      console.error("Failed to parse JSON db, initiating clean template:", err);
-      saveDb();
-    }
-  } else {
-    console.log("JSON Db file did not exist. Seeding blank database state.");
-    saveDb();
+function normalizeDbState(raw: unknown): DBState {
+  const parsed = (raw && typeof raw === "object" ? raw : {}) as Partial<DBState>;
+  const users = Array.isArray(parsed.users)
+    ? parsed.users.map((user: any) => ({
+        ...user,
+        email: String(user.email || "").toLowerCase().trim(),
+        password_hash: user.password_hash || user.passwordHash || null,
+      }))
+    : [];
+
+  return {
+    users,
+    habits: Array.isArray(parsed.habits) ? parsed.habits : [],
+    habit_logs: Array.isArray(parsed.habit_logs) ? parsed.habit_logs : [],
+    routines: Array.isArray(parsed.routines) ? parsed.routines : [],
+    routine_logs: Array.isArray(parsed.routine_logs) ? parsed.routine_logs : [],
+  };
+}
+
+function migrateLegacyDatabaseFile(): void {
+  if (process.env.DATA_DIR) return;
+  if (fs.existsSync(JSON_DB_PATH) || !fs.existsSync(LEGACY_DB_PATH)) return;
+
+  try {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.copyFileSync(LEGACY_DB_PATH, JSON_DB_PATH);
+    console.log(`[db] Migrated legacy database file to ${JSON_DB_PATH}`);
+  } catch (err) {
+    console.error("[db] Failed to migrate legacy database file:", err);
   }
+}
+
+function ensureDataDirWritable(): void {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  const probePath = path.join(DATA_DIR, ".write_probe");
+  fs.writeFileSync(probePath, "ok", "utf-8");
+  fs.unlinkSync(probePath);
+}
+
+/** Persist in-memory state to disk using an atomic write. */
+function saveDb(): void {
+  try {
+    ensureDataDirWritable();
+    const payload = JSON.stringify(dbState, null, 2);
+    const tempPath = `${JSON_DB_PATH}.${process.pid}.${Date.now()}.tmp`;
+
+    fs.writeFileSync(tempPath, payload, "utf-8");
+
+    // Windows cannot rename over an existing file in all Node versions
+    if (fs.existsSync(JSON_DB_PATH)) {
+      fs.unlinkSync(JSON_DB_PATH);
+    }
+    fs.renameSync(tempPath, JSON_DB_PATH);
+
+    dbLastSavedAt = new Date().toISOString();
+    dbLoadError = null;
+
+    console.log("[db] Saved database", {
+      path: JSON_DB_PATH,
+      users: dbState.users.length,
+      habits: dbState.habits.length,
+      savedAt: dbLastSavedAt,
+    });
+  } catch (err: any) {
+    const message = err?.message || String(err);
+    dbLoadError = `save failed: ${message}`;
+    console.error("[db] CRITICAL: Failed to save database:", {
+      path: JSON_DB_PATH,
+      dataDir: DATA_DIR,
+      error: message,
+    });
+    throw new Error(`Failed to persist database: ${message}`);
+  }
+}
+
+/** Reload latest state from disk (used before auth to survive restarts cleanly). */
+function reloadDbFromDisk(): boolean {
+  if (!fs.existsSync(JSON_DB_PATH)) {
+    return false;
+  }
+
+  try {
+    const stat = fs.statSync(JSON_DB_PATH);
+    if (stat.size === 0) {
+      return false;
+    }
+
+    const raw = fs.readFileSync(JSON_DB_PATH, "utf-8");
+    dbState = normalizeDbState(JSON.parse(raw));
+    dbLoadError = null;
+    return true;
+  } catch (err: any) {
+    console.error("[db] reloadDbFromDisk failed:", err?.message || err);
+    return false;
+  }
+}
+
+function ensureAuthStorageReady(res: express.Response): boolean {
+  if (dbLoadError?.includes("not writable")) {
+    res.status(503).json({
+      error:
+        "Account storage is not writable. Set DATA_DIR=/var/data and attach a persistent disk on Render.",
+    });
+    return false;
+  }
+  return true;
+}
+
+function verifyUserPersisted(emailLower: string): void {
+  if (!fs.existsSync(JSON_DB_PATH)) {
+    throw new Error("Database file missing immediately after save.");
+  }
+
+  const raw = fs.readFileSync(JSON_DB_PATH, "utf-8");
+  const parsed = normalizeDbState(JSON.parse(raw));
+  const savedUser = parsed.users.find((user) => user.email === emailLower);
+
+  if (!savedUser?.password_hash) {
+    throw new Error("Registered user was not found on disk after save.");
+  }
+}
+
+/** Load database from disk. Never overwrites an existing file on parse failure. */
+function initDb(): void {
+  migrateLegacyDatabaseFile();
+
+  console.log("\n=== Database Startup ===");
+  console.log("[db] DATA_DIR:", DATA_DIR);
+  console.log("[db] JSON_DB_PATH:", JSON_DB_PATH);
+  console.log("[db] NODE_ENV:", process.env.NODE_ENV || "development");
+  console.log("[db] DATA_DIR env set:", Boolean(process.env.DATA_DIR));
+
+  if (process.env.NODE_ENV === "production" && !process.env.DATA_DIR) {
+    console.error(
+      "[db] CRITICAL: DATA_DIR is not set in production. " +
+        "Attach a Render persistent disk at /var/data and set DATA_DIR=/var/data " +
+        "or user accounts will be lost on every redeploy."
+    );
+  }
+
+  try {
+    ensureDataDirWritable();
+    console.log("[db] DATA_DIR is writable.");
+  } catch (err: any) {
+    dbLoadError = `DATA_DIR not writable: ${err?.message || err}`;
+    console.error("[db] CRITICAL:", dbLoadError);
+  }
+
+  if (!fs.existsSync(JSON_DB_PATH)) {
+    console.warn("[db] Database file not found. Creating a new empty database file.");
+    dbState = emptyDbState();
+    saveDb();
+    logDbStartupSummary();
+    return;
+  }
+
+  const stat = fs.statSync(JSON_DB_PATH);
+  console.log("[db] Existing database file found:", {
+    bytes: stat.size,
+    modifiedAt: stat.mtime.toISOString(),
+  });
+
+  if (stat.size === 0) {
+    dbLoadError = "Database file exists but is empty.";
+    console.error("[db] CRITICAL:", dbLoadError, "Refusing to overwrite existing file.");
+    dbState = emptyDbState();
+    logDbStartupSummary();
+    return;
+  }
+
+  try {
+    const raw = fs.readFileSync(JSON_DB_PATH, "utf-8");
+    dbState = normalizeDbState(JSON.parse(raw));
+    dbLoadError = null;
+    console.log("[db] Database loaded successfully.");
+  } catch (err: any) {
+    const backupPath = `${JSON_DB_PATH}.corrupt.${Date.now()}.bak`;
+    dbLoadError = `load failed: ${err?.message || err}`;
+    console.error("[db] CRITICAL: Failed to parse database JSON:", dbLoadError);
+
+    try {
+      fs.copyFileSync(JSON_DB_PATH, backupPath);
+      console.error(`[db] Corrupt database backed up to ${backupPath}`);
+      console.error("[db] Existing database was NOT overwritten. Fix or restore the backup manually.");
+    } catch (backupErr) {
+      console.error("[db] Failed to back up corrupt database file:", backupErr);
+    }
+
+    dbState = emptyDbState();
+  }
+
+  logDbStartupSummary();
+}
+
+function logDbStartupSummary(): void {
+  const usersWithHashes = dbState.users.filter((user) => Boolean(user.password_hash)).length;
+  console.log("[db] Startup summary:", {
+    users: dbState.users.length,
+    usersWithPasswordHashes: usersWithHashes,
+    habits: dbState.habits.length,
+    habit_logs: dbState.habit_logs.length,
+    routines: dbState.routines.length,
+    routine_logs: dbState.routine_logs.length,
+    lastSavedAt: dbLastSavedAt,
+    loadError: dbLoadError,
+  });
+  console.log("========================\n");
+}
+
+function getDbHealthInfo() {
+  let fileExists = false;
+  let fileBytes = 0;
+  let fileModifiedAt: string | null = null;
+
+  if (fs.existsSync(JSON_DB_PATH)) {
+    fileExists = true;
+    const stat = fs.statSync(JSON_DB_PATH);
+    fileBytes = stat.size;
+    fileModifiedAt = stat.mtime.toISOString();
+  }
+
+  return {
+    path: JSON_DB_PATH,
+    dataDir: DATA_DIR,
+    fileExists,
+    fileBytes,
+    fileModifiedAt,
+    usersInMemory: dbState.users.length,
+    usersWithPasswordHashes: dbState.users.filter((user) => Boolean(user.password_hash)).length,
+    lastSavedAt: dbLastSavedAt,
+    loadError: dbLoadError,
+    persistentStorageConfigured: Boolean(process.env.DATA_DIR),
+  };
 }
 
 // Authentication Middleware
@@ -161,26 +385,38 @@ async function startServer() {
   // --- REST ENDPOINTS ---
 
   app.get("/api/health", (_req, res) => {
-    res.json({ status: "ok" });
+    const db = getDbHealthInfo();
+    res.json({
+      status: db.loadError ? "degraded" : "ok",
+      database: db,
+    });
   });
 
   // 1. Authentication
 
   // Register
   app.post("/api/auth/register", async (req, res) => {
+    if (!ensureAuthStorageReady(res)) return;
+
     const { email, password } = req.body;
     if (!email || !password) {
       return res.status(400).json({ error: "Email and password are required fields." });
     }
 
+    if (String(password).length < 6) {
+      return res.status(400).json({ error: "Password must be at least 6 characters." });
+    }
+
     try {
-      const emailLower = email.toLowerCase().trim();
+      reloadDbFromDisk();
+
+      const emailLower = String(email).toLowerCase().trim();
       const existingUser = dbState.users.find(u => u.email === emailLower);
       if (existingUser) {
         return res.status(400).json({ error: "A user with this email address already exists." });
       }
 
-      const passwordHash = await bcrypt.hash(password, 10);
+      const passwordHash = await bcrypt.hash(String(password), 10);
       
       const newUserId = dbState.users.length > 0 
         ? Math.max(...dbState.users.map(u => u.id)) + 1 
@@ -225,7 +461,17 @@ async function startServer() {
         });
       }
 
-      saveDb();
+      try {
+        saveDb();
+        verifyUserPersisted(emailLower);
+      } catch (persistErr) {
+        // Roll back in-memory user if disk write failed
+        dbState.users = dbState.users.filter(u => u.id !== newUserId);
+        dbState.habits = dbState.habits.filter(h => h.user_id !== newUserId);
+        throw persistErr;
+      }
+
+      console.log("[auth] Registered new user", { email: emailLower, userId: newUserId, totalUsers: dbState.users.length });
 
       const token = jwt.sign({ id: newUserId, email: emailLower }, JWT_SECRET, { expiresIn: "7d" });
 
@@ -248,22 +494,48 @@ async function startServer() {
 
   // Login
   app.post("/api/auth/login", async (req, res) => {
+    if (!ensureAuthStorageReady(res)) return;
+
     const { email, password } = req.body;
     if (!email || !password) {
       return res.status(400).json({ error: "Email and password are required fields." });
     }
 
     try {
-      const emailLower = email.toLowerCase().trim();
+      reloadDbFromDisk();
+
+      const emailLower = String(email).toLowerCase().trim();
       const user = dbState.users.find(u => u.email === emailLower);
+
       if (!user) {
+        console.warn("[auth] Login failed: user not found", {
+          email: emailLower,
+          usersInDatabase: dbState.users.length,
+          databasePath: JSON_DB_PATH,
+          loadError: dbLoadError,
+        });
         return res.status(401).json({ error: "Invalid email or password." });
       }
 
-      const match = await bcrypt.compare(password, user.password_hash);
-      if (!match) {
+      if (!user.password_hash || typeof user.password_hash !== "string") {
+        console.error("[auth] Login failed: user record missing password hash", {
+          email: emailLower,
+          userId: user.id,
+        });
         return res.status(401).json({ error: "Invalid email or password." });
       }
+
+      const match = await bcrypt.compare(String(password), user.password_hash);
+      if (!match) {
+        console.warn("[auth] Login failed: password mismatch", {
+          email: emailLower,
+          userId: user.id,
+          hashPrefix: user.password_hash.slice(0, 7),
+        });
+        return res.status(401).json({ error: "Invalid email or password." });
+      }
+
+      console.log("[auth] Login successful", { email: emailLower, userId: user.id });
 
       const token = jwt.sign({ id: user.id, email: user.email }, JWT_SECRET, { expiresIn: "7d" });
 
@@ -791,8 +1063,23 @@ async function startServer() {
   }
 
   app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Express Full-stack server compiled and running live on port ${PORT}`);
+    console.log(`Express Full-stack server running on port ${PORT}`);
+    console.log(`Health check: http://localhost:${PORT}/api/health`);
   });
+
+  const shutdown = (signal: string) => {
+    console.log(`[server] ${signal} received — flushing database to disk...`);
+    try {
+      saveDb();
+      console.log("[server] Database saved on shutdown.");
+    } catch (err) {
+      console.error("[server] Failed to save database on shutdown:", err);
+    }
+    process.exit(0);
+  };
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
 }
 
 startServer().catch((err) => {

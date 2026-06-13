@@ -42,6 +42,15 @@ DATA_DIR=/var/data
 Attach a persistent disk mounted at `/var/data`. Without the disk, accounts and
 habits can disappear whenever the Render service restarts or redeploys.
 
+On startup the API logs the database path and user count. Verify persistence with:
+
+```text
+https://your-api-name.onrender.com/api/health
+```
+
+You should see `database.usersInMemory` increase after registration and stay
+the same after a redeploy when `DATA_DIR=/var/data` and the disk are configured.
+
 ### Vercel Frontend
 
 Import the same repository into Vercel and configure:

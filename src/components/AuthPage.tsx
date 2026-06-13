@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { api } from '../api';
-import { Zap, Shield, Sparkles, AlertCircle, ArrowUpRight, Trophy } from 'lucide-react';
-import { motion } from 'motion/react';
+import { api, ApiError } from '../api';
+import { Zap, Shield, Sparkles, AlertCircle, ArrowUpRight } from 'lucide-react';
+
+const GUEST_CREDENTIALS_KEY = 'habit_mountain_guest_credentials';
 
 interface AuthPageProps {
   onAuthSuccess: (token: string, user: any) => void;
@@ -26,15 +27,20 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
     }
 
     try {
+      const normalizedEmail = email.trim();
       if (isLogin) {
-        const data = await api.login(email, password);
+        const data = await api.login(normalizedEmail, password);
         onAuthSuccess(data.token, data.user);
       } else {
-        const data = await api.register(email, password);
+        const data = await api.register(normalizedEmail, password);
         onAuthSuccess(data.token, data.user);
       }
     } catch (err: any) {
-      setError(err.message || 'An unexpected authentication failure occurred.');
+      const message =
+        err instanceof ApiError && err.status === 503
+          ? 'Server storage is not configured. Accounts cannot be saved on this deployment yet.'
+          : err.message || 'An unexpected authentication failure occurred.';
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -44,15 +50,31 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
     setError(null);
     setLoading(true);
     try {
-      // Automatic quick guest logging for seamless platform verification
+      // Reuse saved guest account so logout + login works for demo users
+      const savedRaw = localStorage.getItem(GUEST_CREDENTIALS_KEY);
+      if (savedRaw) {
+        try {
+          const saved = JSON.parse(savedRaw) as { email: string; password: string };
+          const data = await api.login(saved.email, saved.password);
+          onAuthSuccess(data.token, data.user);
+          return;
+        } catch {
+          localStorage.removeItem(GUEST_CREDENTIALS_KEY);
+        }
+      }
+
       const randomId = Math.floor(Math.random() * 100000);
       const demoEmail = `guest_${randomId}@habitmountain.com`;
       const demoPassword = 'guestPassword123';
 
       const data = await api.register(demoEmail, demoPassword);
+      localStorage.setItem(
+        GUEST_CREDENTIALS_KEY,
+        JSON.stringify({ email: demoEmail, password: demoPassword })
+      );
       onAuthSuccess(data.token, data.user);
     } catch (err: any) {
-      setError(err.message || 'Failed to initialize seamless guest login session.');
+      setError(err.message || 'Failed to initialize guest session.');
     } finally {
       setLoading(false);
     }
@@ -157,7 +179,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
           className="w-full bg-[#161925] hover:bg-[#1E2332] border border-[#242A3D] text-gray-300 font-medium py-3 rounded-xl transition flex items-center justify-center gap-2 cursor-pointer text-sm"
         >
           <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
-          <span>Onboard as Guest (Create Instant Account)</span>
+          <span>Try Guest Account (saved on this device)</span>
         </button>
 
         <div className="text-center mt-6">

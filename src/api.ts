@@ -2,6 +2,10 @@ import { Habit, Routine, UserStats } from './types';
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/+$/, '');
 
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
 export class ApiError extends Error {
   status: number;
 
@@ -59,14 +63,14 @@ export const api = {
   async login(emailStr: string, passwordStr: string) {
     return fetchWithAuth('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email: emailStr, password: passwordStr }),
+      body: JSON.stringify({ email: normalizeEmail(emailStr), password: passwordStr }),
     });
   },
 
   async register(emailStr: string, passwordStr: string) {
     return fetchWithAuth('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email: emailStr, password: passwordStr }),
+      body: JSON.stringify({ email: normalizeEmail(emailStr), password: passwordStr }),
     });
   },
 
