@@ -9,23 +9,51 @@ import { config as loadDotenv } from "dotenv";
 loadDotenv();
 
 const PORT = Number(process.env.PORT) || 3000;
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const JWT_SECRET =
   process.env.JWT_SECRET ||
-  (process.env.NODE_ENV !== "production" ? "mountain-summit-secret-token-dev" : "mountain-summit-secret-token-prod-fallback");
+  (!IS_PRODUCTION ? "mountain-summit-secret-token-dev" : "mountain-summit-secret-token-prod-fallback");
 
-function resolveDataDir(): string {
-  if (process.env.DATA_DIR) {
-    return path.resolve(process.env.DATA_DIR);
-  }
-  // Render persistent disks are commonly mounted at /var/data
-  if (process.env.NODE_ENV === "production" && fs.existsSync("/var/data")) {
-    console.log("[db] Auto-detected Render persistent disk at /var/data");
-    return "/var/data";
-  }
-  return path.join(process.cwd(), "data");
+interface DataDirResolution {
+  path: string;
+  source: "DATA_DIR" | "render-auto" | "local";
+  persistent: boolean;
+  warning?: string;
 }
 
-const DATA_DIR = resolveDataDir();
+function resolveDataDir(): DataDirResolution {
+  const configuredDataDir = process.env.DATA_DIR?.trim();
+  if (configuredDataDir) {
+    return {
+      path: path.resolve(configuredDataDir),
+      source: "DATA_DIR",
+      persistent: true,
+    };
+  }
+
+  // Render persistent disks are commonly mounted at /var/data.
+  if (IS_PRODUCTION && fs.existsSync("/var/data")) {
+    console.log("[db] Auto-detected Render persistent disk at /var/data");
+    return {
+      path: "/var/data",
+      source: "render-auto",
+      persistent: true,
+    };
+  }
+
+  return {
+    path: path.join(process.cwd(), "data"),
+    source: "local",
+    persistent: !IS_PRODUCTION,
+    warning: IS_PRODUCTION
+      ? "Persistent account storage is not configured. Set DATA_DIR=/var/data and attach a persistent disk."
+      : undefined,
+  };
+}
+
+const DATA_DIR_INFO = resolveDataDir();
+const DATA_DIR = DATA_DIR_INFO.path;
+const AUTH_STORAGE_CONFIG_ERROR = DATA_DIR_INFO.warning || null;
 const JSON_DB_PATH = path.join(DATA_DIR, "mountain_habit_tracker_db.json");
 const LEGACY_DB_PATH = path.join(process.cwd(), "mountain_habit_tracker_db.json");
 const configuredOrigins = (process.env.CLIENT_ORIGIN || "")
@@ -68,9 +96,10 @@ function normalizeDbState(raw: unknown): DBState {
   const users = Array.isArray(parsed.users)
     ? parsed.users.map((user: any) => ({
         ...user,
+        id: Number(user.id),
         email: String(user.email || "").toLowerCase().trim(),
         password_hash: user.password_hash || user.passwordHash || null,
-      }))
+      })).filter((user: any) => Number.isFinite(user.id) && user.email)
     : [];
 
   return {
@@ -147,6 +176,7 @@ function reloadDbFromDisk(): boolean {
   try {
     const stat = fs.statSync(JSON_DB_PATH);
     if (stat.size === 0) {
+      dbLoadError = "Database file exists but is empty.";
       return false;
     }
 
@@ -155,19 +185,31 @@ function reloadDbFromDisk(): boolean {
     dbLoadError = null;
     return true;
   } catch (err: any) {
-    console.error("[db] reloadDbFromDisk failed:", err?.message || err);
+    dbLoadError = `reload failed: ${err?.message || err}`;
+    console.error("[db] reloadDbFromDisk failed:", dbLoadError);
     return false;
   }
 }
 
+function getAuthStorageError(): string | null {
+  if (AUTH_STORAGE_CONFIG_ERROR) {
+    return AUTH_STORAGE_CONFIG_ERROR;
+  }
+
+  if (dbLoadError) {
+    return `Account storage is unavailable: ${dbLoadError}`;
+  }
+
+  return null;
+}
+
 function ensureAuthStorageReady(res: express.Response): boolean {
-  if (dbLoadError?.includes("not writable")) {
-    res.status(503).json({
-      error:
-        "Account storage is not writable. Set DATA_DIR=/var/data and attach a persistent disk on Render.",
-    });
+  const storageError = getAuthStorageError();
+  if (storageError) {
+    res.status(503).json({ error: storageError });
     return false;
   }
+
   return true;
 }
 
@@ -191,15 +233,16 @@ function initDb(): void {
 
   console.log("\n=== Database Startup ===");
   console.log("[db] DATA_DIR:", DATA_DIR);
+  console.log("[db] DATA_DIR source:", DATA_DIR_INFO.source);
+  console.log("[db] Persistent storage:", DATA_DIR_INFO.persistent);
   console.log("[db] JSON_DB_PATH:", JSON_DB_PATH);
   console.log("[db] NODE_ENV:", process.env.NODE_ENV || "development");
-  console.log("[db] DATA_DIR env set:", Boolean(process.env.DATA_DIR));
+  console.log("[db] DATA_DIR env set:", Boolean(process.env.DATA_DIR?.trim()));
 
-  if (process.env.NODE_ENV === "production" && !process.env.DATA_DIR) {
+  if (AUTH_STORAGE_CONFIG_ERROR) {
     console.error(
-      "[db] CRITICAL: DATA_DIR is not set in production. " +
-        "Attach a Render persistent disk at /var/data and set DATA_DIR=/var/data " +
-        "or user accounts will be lost on every redeploy."
+      `[db] CRITICAL: ${AUTH_STORAGE_CONFIG_ERROR} ` +
+        "Registration and login are disabled until persistent storage is configured."
     );
   }
 
@@ -267,6 +310,7 @@ function logDbStartupSummary(): void {
     routines: dbState.routines.length,
     routine_logs: dbState.routine_logs.length,
     lastSavedAt: dbLastSavedAt,
+    storageConfigError: AUTH_STORAGE_CONFIG_ERROR,
     loadError: dbLoadError,
   });
   console.log("========================\n");
@@ -287,14 +331,16 @@ function getDbHealthInfo() {
   return {
     path: JSON_DB_PATH,
     dataDir: DATA_DIR,
+    dataDirSource: DATA_DIR_INFO.source,
     fileExists,
     fileBytes,
     fileModifiedAt,
     usersInMemory: dbState.users.length,
     usersWithPasswordHashes: dbState.users.filter((user) => Boolean(user.password_hash)).length,
     lastSavedAt: dbLastSavedAt,
+    storageConfigError: AUTH_STORAGE_CONFIG_ERROR,
     loadError: dbLoadError,
-    persistentStorageConfigured: Boolean(process.env.DATA_DIR),
+    persistentStorageConfigured: DATA_DIR_INFO.persistent,
   };
 }
 
@@ -307,6 +353,16 @@ interface AuthRequest extends express.Request {
 }
 
 function authenticateToken(req: AuthRequest, res: express.Response, next: express.NextFunction) {
+  if (AUTH_STORAGE_CONFIG_ERROR) {
+    return res.status(503).json({ error: AUTH_STORAGE_CONFIG_ERROR });
+  }
+
+  reloadDbFromDisk();
+  const storageError = getAuthStorageError();
+  if (storageError) {
+    return res.status(503).json({ error: storageError });
+  }
+
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
 
@@ -318,7 +374,14 @@ function authenticateToken(req: AuthRequest, res: express.Response, next: expres
     if (err) {
       return res.status(403).json({ error: "Session expired or invalid token. Please sign in again." });
     }
-    req.user = { id: decoded.id, email: decoded.email };
+
+    const userId = Number(decoded.id);
+    const user = dbState.users.find(u => u.id === userId);
+    if (!user) {
+      return res.status(401).json({ error: "Session user was not found. Please sign in again." });
+    }
+
+    req.user = { id: user.id, email: user.email };
     next();
   });
 }
@@ -382,12 +445,17 @@ async function startServer() {
   // Init JSON db structure
   initDb();
 
+  app.use("/api", (_req, _res, next) => {
+    reloadDbFromDisk();
+    next();
+  });
+
   // --- REST ENDPOINTS ---
 
   app.get("/api/health", (_req, res) => {
     const db = getDbHealthInfo();
     res.json({
-      status: db.loadError ? "degraded" : "ok",
+      status: db.loadError || db.storageConfigError ? "degraded" : "ok",
       database: db,
     });
   });

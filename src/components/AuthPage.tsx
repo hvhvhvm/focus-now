@@ -27,7 +27,8 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
     }
 
     try {
-      const normalizedEmail = email.trim();
+      const normalizedEmail = email.trim().toLowerCase();
+      console.log('[AuthPage] Attempting auth with email:', normalizedEmail);
       if (isLogin) {
         const data = await api.login(normalizedEmail, password);
         onAuthSuccess(data.token, data.user);
