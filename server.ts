@@ -125,7 +125,13 @@ function migrateLegacyDatabaseFile(): void {
 }
 
 function ensureDataDirWritable(): void {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+  if (!fs.existsSync(DATA_DIR)) {
+    if (DATA_DIR !== "/var/data") {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    } else {
+      throw new Error(`Directory ${DATA_DIR} does not exist. On Render, ensure a persistent disk is mounted at /var/data.`);
+    }
+  }
   const probePath = path.join(DATA_DIR, ".write_probe");
   fs.writeFileSync(probePath, "ok", "utf-8");
   fs.unlinkSync(probePath);
@@ -1153,3 +1159,4 @@ async function startServer() {
 startServer().catch((err) => {
   console.error("Express failed on startup crash:", err);
 });
+
