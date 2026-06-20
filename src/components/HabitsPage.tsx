@@ -2,11 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { 
   Zap, Clock, Repeat, Plus, Check, Play, Pause, RotateCcw, 
   ChevronLeft, MoreVertical, Trash2, Pencil, Undo2,
-  Dumbbell, BookOpen, Heart, Brain, Navigation, Sparkles
+  Dumbbell, BookOpen, Heart, Brain, Navigation, Sparkles, CalendarDays
 } from 'lucide-react';
 import { Habit, Category, Routine } from '../types';
-import { dateToday } from '../data';
+import { dateToday, isHabitScheduledForDate, formatDateString } from '../data';
 import CategoryDetailView from './CategoryDetailView';
+import { useToast } from './Toast';
+
 
 const getCategoryConfigInPage = (category: Category) => {
   switch (category) {
@@ -155,7 +157,9 @@ export default function HabitsPage({
   selectedCategoryId,
   setSelectedCategoryId
 }: HabitsPageProps) {
+  const toast = useToast();
   const [activeSubTab, setActiveSubTab] = useState<'all' | 'routines'>('all');
+
   const [selectedFilter, setSelectedFilter] = useState<'active' | 'completed'>('active');
   const [selectedCategory, setSelectedCategory] = useState<Category | 'All'>('All');
   const [expandedHabitId, setExpandedHabitId] = useState<string | null>(null);
@@ -182,7 +186,7 @@ export default function HabitsPage({
             if (habitObj) {
               onLogHabit(habitObj.id, habitObj.target);
             }
-            alert(`Focus Session Completed for ${habitObj?.name}! Earned ⚡ ${habitObj?.points} pts!`);
+            toast.success(`Focus session complete for "${habitObj?.name}"! +${habitObj?.points} pts earned!`);
             return 0;
           }
           return prev - 1;
@@ -191,6 +195,7 @@ export default function HabitsPage({
     }
     return () => clearInterval(timerId);
   }, [isTimerRunning, activeTimerId, timeLeft, habits, onLogHabit]);
+
 
   const startTimer = (habitId: string, durationMin: number) => {
     setActiveTimerId(habitId);
@@ -209,8 +214,11 @@ export default function HabitsPage({
     return Math.round(completedRatioSum / catHabits.length);
   };
 
-  // Filter logic
+  // Filter logic — always respect schedule for today
   const filteredHabits = habits.filter((h) => {
+    // Only show habits that are scheduled for today
+    if (!isHabitScheduledForDate(h, dateToday)) return false;
+
     const progressVal = h.history[dateToday] || 0;
     const isCompleted = progressVal >= h.target;
 
@@ -222,7 +230,10 @@ export default function HabitsPage({
     return matchesFilter && matchesCategory;
   });
 
-  const remainingCount = habits.filter((h) => (h.history[dateToday] || 0) < h.target).length;
+  // Remaining count only counts habits scheduled for today
+  const scheduledTodayHabits = habits.filter(h => isHabitScheduledForDate(h, dateToday));
+  const remainingCount = scheduledTodayHabits.filter((h) => (h.history[dateToday] || 0) < h.target).length;
+
 
   const handleCustomLogSubmit = (e: React.FormEvent, habitId: string) => {
     e.preventDefault();
@@ -285,15 +296,30 @@ export default function HabitsPage({
             </div>
             <div className="text-right">
               <span className="text-xs text-gray-500 font-mono block">ROUTINE AWARD</span>
-              <span className="text-lg font-bold text-[#FCC419] font-sans">⚡ {routineObj.points} pts</span>
+              <span className="text-lg font-bold text-[#FCC419] font-sans flex items-center gap-1"><Zap className="w-4 h-4 fill-[#FCC419]" /> {routineObj.points} pts</span>
+
             </div>
           </div>
 
           <div className="mt-6 grid grid-cols-2 gap-4 border-t border-[#1C1F2B] pt-5">
             <div>
               <span className="text-[10px] font-mono text-gray-500 uppercase block">7-Day Consistency</span>
-              <span className="text-2xl font-black text-white font-mono mt-0.5">14%</span>
+              {(() => {
+                // Compute real 7-day consistency from completedHistory
+                let completedDays = 0;
+                for (let i = 0; i < 7; i++) {
+                  const d = new Date();
+                  d.setDate(d.getDate() - i);
+                  const dateStr = formatDateString(d);
+                  if (routineObj.completedHistory?.[dateStr]) completedDays++;
+                }
+                const consistency7 = Math.round((completedDays / 7) * 100);
+                return (
+                  <span className="text-2xl font-black text-white font-mono mt-0.5">{consistency7}%</span>
+                );
+              })()}
             </div>
+
             <div>
               <span className="text-[10px] font-mono text-gray-500 uppercase block">Today&apos;s Progress</span>
               <span className="text-2xl font-black text-[#12B886] font-mono mt-0.5">
@@ -665,10 +691,11 @@ export default function HabitsPage({
                                 {item.category}
                               </span>
 
-                              {/* Points Reward badge */}
+                              {/* Points Reward badge — use Lucide icon to avoid mojibake */}
                               <span className="flex items-center px-1.5 py-0.5 border border-[#FCC419]/25 bg-[#FCC419]/05 text-[#FCC419] rounded">
                                 <Zap className="w-3 h-3 mr-0.5 fill-[#FCC419]" /> {item.points}
                               </span>
+
 
                               {/* Target Time/TimeOfDay */}
                               <span className="flex items-center px-1.5 py-0.5 border border-gray-800 bg-gray-900/10 text-gray-500 rounded">
@@ -824,12 +851,34 @@ export default function HabitsPage({
 
             const hasAnyBlocks = renderedBlocks.some(b => b !== null);
 
+            // No habits at all — show create CTA
+            if (scheduledTodayHabits.length === 0) {
+              return (
+                <div className="flex flex-col items-center justify-center py-24 px-6 text-center">
+                  <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-center mb-5">
+                    <Sparkles className="w-8 h-8 text-emerald-400" />
+                  </div>
+                  <h3 className="text-xl font-bold text-white font-sans">No Habits Scheduled Today</h3>
+                  <p className="text-sm text-gray-500 mt-2 max-w-xs leading-relaxed">
+                    Create your first habit to start tracking progress and earning points.
+                  </p>
+                  <button
+                    onClick={openCreateHabit}
+                    className="mt-6 flex items-center space-x-2 bg-[#12B886] hover:bg-[#0E906B] text-[#0A0D10] font-extrabold text-sm px-5 py-2.5 rounded-xl cursor-pointer transition shadow-lg shadow-emerald-500/15"
+                  >
+                    <Plus className="w-4 h-4 stroke-[3px]" />
+                    <span>Create Your First Habit</span>
+                  </button>
+                </div>
+              );
+            }
+
             return hasAnyBlocks ? renderedBlocks : (
               <div className="col-span-full h-64 bg-[#121419]/70 border border-dashed border-[#222631] text-center p-12 rounded-2xl flex flex-col items-center justify-center">
                 <span className="text-3xl">🧘</span>
                 <h3 className="text-base font-bold text-white font-sans mt-3">All habits filtered out</h3>
                 <p className="text-xs text-gray-500 font-sans mt-1">
-                  Adjust active filter category presets or create a new habit.
+                  Adjust active filter or category, or create a new habit.
                 </p>
               </div>
             );
@@ -837,52 +886,74 @@ export default function HabitsPage({
         </div>
       ) : (
         /* Routines SubTab Grid */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {routines.map((rt) => {
-            const rtHabits = habits.filter(h => rt.habitIds.includes(h.id));
-            const doneInRt = rtHabits.filter(h => (h.history[dateToday] || 0) >= h.target).length;
-            const totalInRt = rtHabits.length;
-            const progress = totalInRt > 0 ? Math.round((doneInRt / totalInRt) * 100) : 0;
-
-            return (
-              <div
-                key={rt.id}
-                onClick={() => setSelectedRoutineId(rt.id)}
-                className="bg-[#12141A] hover:bg-[#1A1D28] border border-[#222631] hover:border-purple-500/20 p-5 rounded-2xl shadow-lg cursor-pointer transition flex flex-col justify-between min-h-[220px]"
-              >
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono tracking-widest text-[#B197FC] font-semibold bg-[#B197FC]/5 border border-[#B197FC]/15 px-2.5 py-0.5 rounded uppercase">
-                      {rt.timeBlock} Block
-                    </span>
-                    <span className="text-xs text-[#FCC419] font-mono">
-                      ⚡ {rt.points} Bonus
-                    </span>
-                  </div>
-
-                  <h3 className="text-xl font-bold font-sans text-white mt-4">
-                    {rt.name}
-                  </h3>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {doneInRt} active / {totalInRt} total habits done
-                  </p>
-                </div>
-
-                <div className="mt-5">
-                  <div className="flex justify-between items-baseline text-xs mb-1.5 font-semibold font-mono">
-                    <span className="text-[#B197FC]">{progress}% Done</span>
-                    <span className="text-gray-500">{doneInRt}/{totalInRt} done</span>
-                  </div>
-                  <div className="w-full h-1.5 bg-[#171924]/80 rounded-full overflow-hidden border border-[#222631]">
-                    <div
-                      className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-300"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-                </div>
+        <div className="space-y-4">
+          {routines.length === 0 ? (
+            /* Empty state for no routines */
+            <div className="flex flex-col items-center justify-center py-24 px-6 text-center">
+              <div className="w-16 h-16 bg-purple-500/10 border border-purple-500/20 rounded-2xl flex items-center justify-center mb-5">
+                <CalendarDays className="w-8 h-8 text-purple-400" />
               </div>
-            );
-          })}
+              <h3 className="text-xl font-bold text-white font-sans">No Routines Yet</h3>
+              <p className="text-sm text-gray-500 mt-2 max-w-xs leading-relaxed">
+                Group related habits into a routine to earn bonus points when you complete them all.
+              </p>
+              <button
+                onClick={openCreateRoutine}
+                className="mt-6 flex items-center space-x-2 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-300 font-bold text-sm px-5 py-2.5 rounded-xl cursor-pointer transition"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Create Your First Routine</span>
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {routines.map((rt) => {
+                const rtHabits = habits.filter(h => rt.habitIds.includes(h.id) && isHabitScheduledForDate(h, dateToday));
+                const doneInRt = rtHabits.filter(h => (h.history[dateToday] || 0) >= h.target).length;
+                const totalInRt = rtHabits.length;
+                const progress = totalInRt > 0 ? Math.round((doneInRt / totalInRt) * 100) : 0;
+
+                return (
+                  <div
+                    key={rt.id}
+                    onClick={() => setSelectedRoutineId(rt.id)}
+                    className="bg-[#12141A] hover:bg-[#1A1D28] border border-[#222631] hover:border-purple-500/20 p-5 rounded-2xl shadow-lg cursor-pointer transition flex flex-col justify-between min-h-[220px]"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-mono tracking-widest text-[#B197FC] font-semibold bg-[#B197FC]/5 border border-[#B197FC]/15 px-2.5 py-0.5 rounded uppercase">
+                          {rt.timeBlock} Block
+                        </span>
+                        <span className="text-xs text-[#FCC419] font-mono flex items-center gap-1">
+                          <Zap className="w-3 h-3 fill-[#FCC419]" /> {rt.points} Bonus
+                        </span>
+                      </div>
+
+                      <h3 className="text-xl font-bold font-sans text-white mt-4">
+                        {rt.name}
+                      </h3>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {doneInRt} of {totalInRt} habits done today
+                      </p>
+                    </div>
+
+                    <div className="mt-5">
+                      <div className="flex justify-between items-baseline text-xs mb-1.5 font-semibold font-mono">
+                        <span className="text-[#B197FC]">{progress}% Done</span>
+                        <span className="text-gray-500">{doneInRt}/{totalInRt} done</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-[#171924]/80 rounded-full overflow-hidden border border-[#222631]">
+                        <div
+                          className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-300"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>

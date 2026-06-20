@@ -22,6 +22,66 @@ export const dateThreeDaysAgo = getOffsetDate(3);
 export const dateFourDaysAgo = getOffsetDate(4);
 export const dateFiveDaysAgo = getOffsetDate(5);
 
+export const getDateDayIndex = (dateStr: string): number => {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  if (!year || !month || !day) return new Date(dateStr).getDay();
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+};
+
+export const isHabitScheduledForDate = (habit: Habit, dateStr: string): boolean => {
+  if (habit.createdAt && new Date(habit.createdAt) > new Date(dateStr)) return false;
+  if (habit.repeat === 'Today Only') return habit.createdAt === dateStr;
+  if (habit.repeat === 'Custom Days') {
+    return habit.repeatDays && habit.repeatDays.length > 0
+      ? habit.repeatDays.includes(getDateDayIndex(dateStr))
+      : true;
+  }
+  return true;
+};
+
+export const isRoutineScheduledForDate = (routine: Routine, dateStr: string): boolean => {
+  if (routine.repeat === 'Today Only') return !Object.keys(routine.completedHistory || {}).some((date) => date !== dateStr);
+  if (routine.repeat === 'Custom Days') {
+    return routine.repeatDays && routine.repeatDays.length > 0
+      ? routine.repeatDays.includes(getDateDayIndex(dateStr))
+      : true;
+  }
+  return true;
+};
+
+export const getScheduledHabits = (habits: Habit[], dateStr: string): Habit[] => {
+  return habits.filter((habit) => isHabitScheduledForDate(habit, dateStr));
+};
+
+export const calculateHabitLogPoints = (habit: Habit, value: number): number => {
+  if (!Number.isFinite(value) || value <= 0 || habit.target <= 0) return 0;
+  if (value >= habit.target) return habit.points + 5;
+  return Math.min(habit.points, Math.max(1, Math.round((value / habit.target) * habit.points)));
+};
+
+export const calculateHabitPointsForDate = (habit: Habit, dateStr: string): number => {
+  return calculateHabitLogPoints(habit, habit.history[dateStr] || 0);
+};
+
+export const calculateRoutinePointsForDate = (routine: Routine, dateStr: string): number => {
+  return routine.completedHistory?.[dateStr] ? routine.points : 0;
+};
+
+export const calculateTotalEarnedPoints = (habits: Habit[], routines: Routine[] = []): number => {
+  const habitPoints = habits.reduce((total, habit) => {
+    return total + Object.entries(habit.history || {}).reduce((habitTotal, [, value]) => {
+      return habitTotal + calculateHabitLogPoints(habit, Number(value));
+    }, 0);
+  }, 0);
+
+  const routinePoints = routines.reduce((total, routine) => {
+    return total + Object.entries(routine.completedHistory || {}).reduce((routineTotal, [dateStr, completed]) => {
+      return routineTotal + (completed ? calculateRoutinePointsForDate(routine, dateStr) : 0);
+    }, 0);
+  }, 0);
+
+  return habitPoints + routinePoints;
+};
 export const INITIAL_HABITS: Habit[] = [
   {
     id: 'habit-1',
@@ -215,10 +275,7 @@ export const getInitialState = (): { habits: Habit[]; routines: Routine[]; total
 
 // Helper to compute progression and momentum mechanics
 export const calculateCompletionRate = (habits: Habit[], dateStr: string): number => {
-  const activeForDate = habits.filter(h => {
-    // If the habit was created after this date, ignore it
-    return new Date(h.createdAt) <= new Date(dateStr);
-  });
+  const activeForDate = getScheduledHabits(habits, dateStr);
 
   if (activeForDate.length === 0) return 0;
 
@@ -232,24 +289,8 @@ export const calculateCompletionRate = (habits: Habit[], dateStr: string): numbe
   return Math.round((totalCompletedRatio / activeForDate.length) * 100);
 };
 
-// Helper for historic calculations with realistic backfill
 export const getCompletionRateForDay = (habits: Habit[], dateStr: string): number => {
-  const count = habits.length;
-  if (count === 0) return 0;
-  
-  // Check if any explicit history exists for this date
-  let hasHistory = false;
-  habits.forEach(h => {
-    if (h.history[dateStr] !== undefined) hasHistory = true;
-  });
-
-  if (hasHistory) {
-    return calculateCompletionRate(habits, dateStr);
-  }
-  
-  // Solid historic baseline so the rolling average stats represent a realistic trend
-  const dayOffset = new Date(dateStr).getDate() || 0;
-  return 60 + (dayOffset % 3) * 8; // e.g., 60%, 68%, 76%
+  return calculateCompletionRate(habits, dateStr);
 };
 
 // Day Signal Target calculation:

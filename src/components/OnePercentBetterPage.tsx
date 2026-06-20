@@ -4,7 +4,8 @@ import {
   Calendar, RotateCcw, TrendingUp, Compass, ChevronRight, Award, Info 
 } from 'lucide-react';
 import { Habit } from '../types';
-import { dateToday } from '../data';
+import { dateToday, formatDateString } from '../data';
+
 
 interface OnePercentBetterPageProps {
   habits: Habit[];
@@ -228,8 +229,13 @@ export default function OnePercentBetterPage({ habits }: OnePercentBetterPagePro
                 Classic Baseline Track
               </h3>
               <p className="text-xs text-gray-400 leading-relaxed">
-                Starts on <strong>Saturday, May 23, 2026</strong>. Instantly analyzes your pre-existing real habit completion history to plot your current climb line over the past week starting from 0%!
+                Starts on <strong>{(() => {
+                  const d = new Date(dateToday);
+                  d.setDate(d.getDate() - 6);
+                  return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+                })()}</strong>. Instantly analyzes your pre-existing real habit completion history to plot your current climb line over the past week starting from 0%!
               </p>
+
             </div>
             <span className="text-[10px] font-mono font-black text-teal-400 block pt-4">
               ✨ recommended for test data
@@ -256,8 +262,9 @@ export default function OnePercentBetterPage({ habits }: OnePercentBetterPagePro
                 Start Fresh Today
               </h3>
               <p className="text-xs text-gray-400 leading-relaxed">
-                Initializes on <strong>Friday, May 29, 2026</strong>. Your official Habit Mountain logs will trigger fresh today starting at exactly <strong>0% Better</strong>.
+                Initializes on <strong>{new Date(dateToday).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</strong>. Your official Habit Mountain logs will trigger fresh today starting at exactly <strong>0% Better</strong>.
               </p>
+
             </div>
             <span className="text-[10px] font-mono font-black text-purple-400 block pt-4">
               🟢 clean fresh launch

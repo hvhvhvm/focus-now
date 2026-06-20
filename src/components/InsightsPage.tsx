@@ -1,7 +1,9 @@
 import React from 'react';
-import { Sparkles, Trophy, Shield, Brain, Zap, Target, Star, ChevronRight, Award, Flame, CheckCircle2, TrendingUp, BookOpen, Dumbbell, PlayCircle } from 'lucide-react';
+import { Sparkles, Award, Flame, Zap } from 'lucide-react';
+
 import { Habit } from '../types';
-import { dateToday, dateYesterday, dateTwoDaysAgo, dateThreeDaysAgo, dateFourDaysAgo, dateFiveDaysAgo } from '../data';
+import { dateToday, dateYesterday, dateTwoDaysAgo, dateThreeDaysAgo, dateFourDaysAgo, dateFiveDaysAgo, formatDateString, calculateHabitLogPoints } from '../data';
+
 
 interface InsightsPageProps {
   habits: Habit[];
@@ -41,30 +43,63 @@ export default function InsightsPage({ habits, userPoints }: InsightsPageProps) 
   // --- Dynamic Live Weekly Points Calculation ---
   const currentWeekDays = [dateFiveDaysAgo, dateFourDaysAgo, dateThreeDaysAgo, dateTwoDaysAgo, dateYesterday, dateToday];
   let computedLiveWeekPoints = 0;
-  
   habits.forEach((h) => {
     currentWeekDays.forEach((dateStr) => {
-      const loggedVal = h.history[dateStr] || 0;
-      if (loggedVal >= h.target) {
-        // Full completion points award
-        computedLiveWeekPoints += h.points + 5;
-      } else if (loggedVal > 0) {
-        // Fractional values
-        computedLiveWeekPoints += Math.round((loggedVal / h.target) * h.points);
-      }
+      computedLiveWeekPoints += calculateHabitLogPoints(h, h.history[dateStr] || 0);
     });
   });
 
-  // Keep a stable, realistic offset as total points baseline
-  const activeWeekPoints = Math.max(145, computedLiveWeekPoints);
+  // --- Dynamic 4-week history buckets ---
+  // Compute points earned in a given date range (inclusive)
+  const getPointsInRange = (startDate: Date, endDate: Date): number => {
+    let total = 0;
+    const cur = new Date(startDate);
+    while (cur <= endDate) {
+      const dateStr = formatDateString(cur);
+      habits.forEach(h => {
+        total += calculateHabitLogPoints(h, h.history[dateStr] || 0);
+      });
+      cur.setDate(cur.getDate() + 1);
+    }
+    return total;
+  };
 
-  // Weekly structure representing points accumulated in segments
-  const weeklyData = [
-    { label: 'Week 1 (May 24 – May 29)', points: activeWeekPoints, max: 400, desc: 'Current Active Sprint Focus', isCurrent: true, color: 'from-[#12B886] to-[#087F5B]' },
-    { label: 'Week 2 (May 17 – May 23)', points: 245, max: 400, desc: 'Stable Identity Transition', isCurrent: false, color: 'from-[#845EF7] to-[#5C7CFA]' },
-    { label: 'Week 3 (May 10 – May 16)', points: 180, max: 400, desc: 'Initial Habit Compound Phase', isCurrent: false, color: 'from-[#FF922B] to-[#E64980]' },
-    { label: 'Week 4 (May 03 – May 09)', points: 110, max: 400, desc: 'Inertia Breaking Practice', isCurrent: false, color: 'from-[#15AABF] to-[#228BE6]' },
-  ];
+  // Generate last 4 rolling 7-day buckets ending today
+  const todayDate = new Date(dateToday);
+  const weeklyData = Array.from({ length: 4 }, (_, idx) => {
+    const endDate = new Date(todayDate);
+    endDate.setDate(todayDate.getDate() - idx * 7);
+    const startDate = new Date(endDate);
+    startDate.setDate(endDate.getDate() - 6);
+
+    const pts = idx === 0 ? computedLiveWeekPoints : getPointsInRange(startDate, endDate);
+    const label = idx === 0
+      ? `This Week (${formatDateString(startDate)} – ${dateToday})`
+      : `${idx === 1 ? 'Last' : idx + ' Weeks Ago'} Week (${formatDateString(startDate)} – ${formatDateString(endDate)})`;
+
+    const colors = [
+      'from-[#12B886] to-[#087F5B]',
+      'from-[#845EF7] to-[#5C7CFA]',
+      'from-[#FF922B] to-[#E64980]',
+      'from-[#15AABF] to-[#228BE6]',
+    ];
+    const descs = [
+      'Current Active Sprint Focus',
+      'Previous Week Activity',
+      'Two Weeks Ago Activity',
+      'Three Weeks Ago Activity',
+    ];
+
+    return {
+      label,
+      points: pts,
+      max: 400,
+      desc: descs[idx],
+      isCurrent: idx === 0,
+      color: colors[idx],
+    };
+  });
+
 
   // --- Category Progress Breakdown ---
   const categoriesToAnalyzeState = [
@@ -170,7 +205,8 @@ export default function InsightsPage({ habits, userPoints }: InsightsPageProps) 
           <div className="text-right shrink-0">
             <span className="text-xs text-gray-500 font-mono block uppercase">YOUR SCORE</span>
             <span className="text-3xl font-black font-mono text-white flex items-center justify-end mt-1">
-              {userPoints} <span className="text-xs text-[#FCC419] font-normal ml-1.5 animate-pulse">⚡ PTS</span>
+              {userPoints} <span className="text-xs text-[#FCC419] font-normal ml-1.5 animate-pulse flex items-center gap-0.5"><Zap className="w-3 h-3 fill-[#FCC419] inline" /> PTS</span>
+
             </span>
           </div>
         </div>

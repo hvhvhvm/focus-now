@@ -9,12 +9,23 @@ import InsightsPage from './components/InsightsPage';
 import ProfilePage from './components/ProfilePage';
 import AuthPage from './components/AuthPage';
 import { CreateHabitModal, CreateRoutineModal } from './components/Modals';
+import { ToastProvider, useToast, ConfirmDialog } from './components/Toast';
 import { Habit, Category, Routine } from './types';
-import { calculateMomentum, dateToday } from './data';
+import { calculateMomentum, dateToday, calculateTotalEarnedPoints, getScheduledHabits } from './data';
 import { api, ApiError } from './api';
 import { Zap } from 'lucide-react';
 
 export default function App() {
+  return (
+    <ToastProvider>
+      <AppInner />
+    </ToastProvider>
+  );
+}
+
+function AppInner() {
+  const toast = useToast();
+
   const [token, setToken] = useState<string | null>(localStorage.getItem('habit_mountain_token'));
   const [currentUser, setCurrentUser] = useState<any | null>(null);
 
@@ -23,6 +34,27 @@ export default function App() {
   const [routines, setRoutines] = useState<Routine[]>([]);
   const [userPoints, setUserPoints] = useState<number>(0);
   const [appLoading, setAppLoading] = useState<boolean>(true);
+
+  // Confirm dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    variant?: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+
+  const openConfirm = (opts: {
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    variant?: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  }) => setConfirmDialog({ isOpen: true, ...opts });
+
+  const closeConfirm = () => setConfirmDialog(prev => ({ ...prev, isOpen: false }));
+
 
   // States for routine timeline details
   const [selectedRoutineId, setSelectedRoutineId] = useState<string | null>(null);
@@ -45,8 +77,6 @@ export default function App() {
       // 1. Fetch profiles
       const profile = await api.getProfile();
       setCurrentUser(profile);
-      setUserPoints(profile.total_points || 0);
-
       // 2. Fetch habits
       const hData = await api.getHabits();
       setHabits(hData);
@@ -54,6 +84,12 @@ export default function App() {
       // 3. Fetch routines
       const rData = await api.getRoutines();
       setRoutines(rData);
+
+      const computedPoints = calculateTotalEarnedPoints(hData, rData);
+      setUserPoints(computedPoints);
+      if ((profile.total_points || 0) !== computedPoints) {
+        await api.syncJourney({ total_points: computedPoints });
+      }
 
     } catch (err: any) {
       console.error('Error loading full-stack assets:', err);
@@ -101,17 +137,16 @@ export default function App() {
     if (!token || habits.length === 0 || routines.length === 0) return;
 
     let pointsBonus = 0;
-    let routinesToUpdate: { id: string; completed: boolean }[] = [];
+    const routinesToUpdate: { id: string; completed: boolean }[] = [];
 
     routines.forEach((rt) => {
-      // Find all habits associated with this routine
-      const routineHabits = habits.filter((h) => rt.habitIds.includes(h.id));
-      
-      // Calculate if they were all fully completed today
+      const routineHabits = getScheduledHabits(
+        habits.filter((h) => rt.habitIds.includes(h.id)),
+        dateToday
+      );
       const allDoneToday =
         routineHabits.length > 0 &&
         routineHabits.every((h) => (h.history[dateToday] || 0) >= h.target);
-      
       const wasDoneEarlierToday = rt.completedHistory[dateToday] || false;
 
       if (allDoneToday && !wasDoneEarlierToday) {
@@ -121,29 +156,20 @@ export default function App() {
     });
 
     if (routinesToUpdate.length > 0) {
-      // Execute database syncs for routine completion status
       const syncRoutinesCompletions = async () => {
         try {
-          const nextPoints = userPoints + pointsBonus;
-          setUserPoints(nextPoints);
-
-          // Update user points in database
-          await api.syncJourney({ total_points: nextPoints });
-
-          // Update routine logger rows
           for (const item of routinesToUpdate) {
             await api.setRoutineStatus(item.id, dateToday, true);
           }
 
-          // Reload fresh data to keep structures integrated perfectly
           const updatedRoutines = await api.getRoutines();
           setRoutines(updatedRoutines);
 
-          // Trigger clean congrats banner feedback
-          setTimeout(() => {
-            alert(`⚡ SUMMIT CHAIN MASTERED!\nYou completed all tasks for routine and gained +${pointsBonus} bonus points!`);
-          }, 100);
+          const nextPoints = calculateTotalEarnedPoints(habits, updatedRoutines);
+          setUserPoints(nextPoints);
+          await api.syncJourney({ total_points: nextPoints });
 
+          toast.success(`Routine mastered! +${pointsBonus} bonus points earned!`);
         } catch (err) {
           console.error('Error synchronizing routine chains:', err);
         }
@@ -152,6 +178,7 @@ export default function App() {
       syncRoutinesCompletions();
     }
   }, [habits, routines, token]);
+
 
   // Handler: Log count/timer progress against a specific habit
   const handleLogHabit = async (id: string, value: number) => {
@@ -165,34 +192,22 @@ export default function App() {
       const wasCompleted = curToday >= targetHabit.target;
       const nowCompleted = newToday >= targetHabit.target;
 
-      let ptsAdd = 0;
-      if (nowCompleted && !wasCompleted) {
-        // Double completions bonus!
-        ptsAdd = targetHabit.points + 5;
-      } else if (!nowCompleted) {
-        // Simple increment points addition
-        ptsAdd = Math.min(targetHabit.points, 2);
-      }
+      if (newToday < 0 || (wasCompleted && nowCompleted)) return;
 
-      const nextPoints = userPoints + ptsAdd;
-      
-      // Sync to database
       await api.logHabit(id, dateToday, value);
-      
-      if (ptsAdd > 0) {
-        await api.syncJourney({ total_points: nextPoints });
-        setUserPoints(nextPoints);
-      }
 
-      // Re-fetch all dynamic logs cleanly
       const updatedHabits = await api.getHabits();
       setHabits(updatedHabits);
+      const nextPoints = calculateTotalEarnedPoints(updatedHabits, routines);
+      setUserPoints(nextPoints);
+      await api.syncJourney({ total_points: nextPoints });
 
     } catch (err: any) {
       console.error('Failed to sync logged progression:', err);
-      alert('Network logging failure: ' + err.message);
+      toast.error('Network logging failure: ' + err.message);
     }
   };
+
 
   // Handler: Save newly created habit
   const handleCreateHabitSubmit = async (habitData: Partial<Habit>) => {
@@ -223,10 +238,12 @@ export default function App() {
       }
 
       closeHabitModal();
+      toast.success('Habit created successfully!');
     } catch (err: any) {
-      alert('Error creating habit index: ' + err.message);
+      toast.error('Error creating habit: ' + err.message);
     }
   };
+
 
   const closeHabitModal = () => {
     setIsHabitModalOpen(false);
@@ -269,34 +286,28 @@ export default function App() {
       }
 
       closeHabitModal();
+      toast.success('Habit updated!');
     } catch (err: any) {
-      alert('Error updating habit: ' + err.message);
+      toast.error('Error updating habit: ' + err.message);
     }
   };
+
 
   const handleRevertHabit = async (id: string) => {
     try {
-      const targetHabit = habits.find((h) => h.id === id);
-      if (!targetHabit) return;
-
-      const curToday = targetHabit.history[dateToday] || 0;
-      const wasCompleted = curToday >= targetHabit.target;
-
       await api.logHabitAbsolute(id, dateToday, 0);
-
-      if (wasCompleted) {
-        const ptsToRemove = targetHabit.points + 5;
-        const nextPoints = Math.max(0, userPoints - ptsToRemove);
-        await api.syncJourney({ total_points: nextPoints });
-        setUserPoints(nextPoints);
-      }
 
       const updatedHabits = await api.getHabits();
       setHabits(updatedHabits);
+      const nextPoints = calculateTotalEarnedPoints(updatedHabits, routines);
+      setUserPoints(nextPoints);
+      await api.syncJourney({ total_points: nextPoints });
+      toast.info('Habit reverted to active.');
     } catch (err: any) {
-      alert('Failed to revert habit: ' + err.message);
+      toast.error('Failed to revert habit: ' + err.message);
     }
   };
+
 
   // Handler: Save newly created routine and auto-create corresponding template habits
   const handleCreateRoutineSubmit = async (rtData: {
@@ -340,10 +351,12 @@ export default function App() {
       setRoutines(nextRoutines);
 
       setIsRoutineModalOpen(false);
+      toast.success(`Routine "${rtData.name}" created!`);
     } catch (err: any) {
-      alert('Error building full routine chain: ' + err.message);
+      toast.error('Error building routine: ' + err.message);
     }
   };
+
 
   // Navigate straight to routine
   const handleNavigateToRoutine = (routineId: string) => {
@@ -356,46 +369,58 @@ export default function App() {
     const habitToDelete = habits.find((habit) => habit.id === id);
     if (!habitToDelete || deletingHabitId) return;
 
-    const shouldDelete = confirm(
-      `Delete "${habitToDelete.name}" permanently? Its progress history will also be removed.`
-    );
-    if (!shouldDelete) return;
-
-    setDeletingHabitId(id);
-    try {
-      await api.deleteHabit(id);
-
-      // Update every local view immediately after the server confirms deletion.
-      setHabits((currentHabits) => currentHabits.filter((habit) => habit.id !== id));
-      setRoutines((currentRoutines) =>
-          currentRoutines.map((routine) => ({
-            ...routine,
-            habitIds: routine.habitIds.filter((habitId) => habitId !== id)
-          }))
-      );
-    } catch (err: any) {
-      alert('Failed to delete habit: ' + err.message);
-    } finally {
-      setDeletingHabitId(null);
-    }
+    openConfirm({
+      title: 'Delete Habit',
+      message: `Delete "${habitToDelete.name}" permanently? Its progress history will also be removed.`,
+      confirmLabel: 'Delete',
+      variant: 'danger',
+      onConfirm: async () => {
+        closeConfirm();
+        setDeletingHabitId(id);
+        try {
+          await api.deleteHabit(id);
+          setHabits((currentHabits) => currentHabits.filter((habit) => habit.id !== id));
+          setRoutines((currentRoutines) =>
+            currentRoutines.map((routine) => ({
+              ...routine,
+              habitIds: routine.habitIds.filter((habitId) => habitId !== id)
+            }))
+          );
+          toast.success(`"${habitToDelete.name}" deleted.`);
+        } catch (err: any) {
+          toast.error('Failed to delete habit: ' + err.message);
+        } finally {
+          setDeletingHabitId(null);
+        }
+      },
+    });
   };
+
 
   // Reset database state completely
   const handleResetApp = async () => {
-    if (confirm('Are you sure you want to reset all tracked points and habit logs to start fresh? This cannot be undone.')) {
-      setAppLoading(true);
-      try {
-        await api.resetAllData();
-        await loadAllData();
-        setTab('dashboard');
-        alert('All database tables successfully wiped & re-seeded to baseline values!');
-      } catch (err: any) {
-        alert('Failure processing reset: ' + err.message);
-      } finally {
-        setAppLoading(false);
-      }
-    }
+    openConfirm({
+      title: 'Reset All Data',
+      message: 'Reset all tracked points and habit logs to start fresh? This cannot be undone.',
+      confirmLabel: 'Reset Everything',
+      variant: 'danger',
+      onConfirm: async () => {
+        closeConfirm();
+        setAppLoading(true);
+        try {
+          await api.resetAllData();
+          await loadAllData();
+          setTab('dashboard');
+          toast.success('All data reset to baseline!');
+        } catch (err: any) {
+          toast.error('Failure processing reset: ' + err.message);
+        } finally {
+          setAppLoading(false);
+        }
+      },
+    });
   };
+
 
   // Render Login/Register Overlay if not authenticated
   if (!token) {
@@ -527,6 +552,17 @@ export default function App() {
         isOpen={isRoutineModalOpen}
         onClose={() => setIsRoutineModalOpen(false)}
         onCreate={handleCreateRoutineSubmit}
+      />
+
+      {/* Polished confirm dialog — replaces browser confirm() */}
+      <ConfirmDialog
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmLabel={confirmDialog.confirmLabel}
+        variant={confirmDialog.variant}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={closeConfirm}
       />
     </div>
   );

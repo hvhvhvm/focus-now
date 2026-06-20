@@ -10,11 +10,21 @@ export class ApiError extends Error {
   }
 }
 
+function isRateLimitError(error: any): boolean {
+  const message = String(error?.message || '').toLowerCase();
+  return error?.status === 429 || message.includes('rate limit') || message.includes('too many requests');
+}
+
+function hasDemoCredentials(): boolean {
+  return Boolean(import.meta.env.VITE_DEMO_EMAIL && import.meta.env.VITE_DEMO_PASSWORD);
+}
+
 export const api = {
   // Authentication & Profile
   async login(emailStr: string, passwordStr: string) {
     const { data, error } = await supabase.auth.signInWithPassword({ email: emailStr, password: passwordStr });
     if (error) throw new ApiError(error.message, error.status || 400);
+    if (!data.session) throw new ApiError('Login failed. Please check your credentials and try again.', 401);
     const profile = await this.getProfile();
     return { token: data.session.access_token, user: profile };
   },
@@ -24,9 +34,54 @@ export const api = {
   },
 
   async register(emailStr: string, passwordStr: string) {
-    const { data, error } = await supabase.auth.signUp({ email: emailStr, password: passwordStr });
-    if (error) throw new ApiError(error.message, error.status || 400);
-    if (!data.session) throw new ApiError('Registration successful. Please check your email to verify your account.', 400);
+    const { data, error } = await supabase.auth.signUp({
+      email: emailStr,
+      password: passwordStr,
+      options: {
+        emailRedirectTo: window.location.origin,
+      },
+    });
+    if (error) {
+      if (isRateLimitError(error)) {
+        throw new ApiError('Signup is temporarily rate limited by Supabase. Please sign in if you already have an account, or try again after the cooldown.', 429);
+      }
+      throw new ApiError(error.message, error.status || 400);
+    }
+    if (!data.session) throw new ApiError('Registration successful. Please check your email to verify your account, then sign in.', 202);
+    const profile = await this.getProfile();
+    return { token: data.session.access_token, user: profile };
+  },
+
+  async loginDemoAccount() {
+    if (!hasDemoCredentials()) {
+      throw new ApiError('Demo login is not configured yet. Add VITE_DEMO_EMAIL and VITE_DEMO_PASSWORD, or enable Anonymous Sign-Ins in Supabase.', 503);
+    }
+    return this.login(import.meta.env.VITE_DEMO_EMAIL, import.meta.env.VITE_DEMO_PASSWORD);
+  },
+
+  async startGuestSession() {
+    const { data: existing } = await supabase.auth.getSession();
+    if (existing.session) {
+      const profile = await this.getProfile();
+      return { token: existing.session.access_token, user: profile };
+    }
+
+    const { data, error } = await supabase.auth.signInAnonymously({
+      options: {
+        data: { display_name: 'Guest User' },
+      },
+    });
+
+    if (error) {
+      if (hasDemoCredentials()) {
+        return this.loginDemoAccount();
+      }
+      if (isRateLimitError(error)) {
+        throw new ApiError('Guest mode is temporarily rate limited by Supabase. Enable a demo account fallback or wait for the rate limit to reset.', 429);
+      }
+      throw new ApiError(`${error.message}. Enable Anonymous Sign-Ins in Supabase Auth, or configure VITE_DEMO_EMAIL and VITE_DEMO_PASSWORD.`, error.status || 400);
+    }
+    if (!data.session) throw new ApiError('Guest session could not be started.', 400);
     const profile = await this.getProfile();
     return { token: data.session.access_token, user: profile };
   },
@@ -34,10 +89,24 @@ export const api = {
   async getProfile() {
     const { data: userAuth, error: authError } = await supabase.auth.getUser();
     if (authError || !userAuth.user) throw new ApiError('Not authenticated', 401);
-    
-    const { data, error } = await supabase.from('profiles').select('*').eq('id', userAuth.user.id).single();
+
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', userAuth.user.id).maybeSingle();
     if (error) throw new ApiError(error.message, 500);
-    return data;
+    if (data) return data;
+
+    const { data: created, error: createError } = await supabase
+      .from('profiles')
+      .insert({
+        id: userAuth.user.id,
+        email: userAuth.user.email || 'Guest User',
+        total_points: 0,
+        locked_in_days: 0,
+        consecutive_locked_in_streak: 0,
+      })
+      .select()
+      .single();
+    if (createError) throw new ApiError(createError.message, 500);
+    return created;
   },
 
   async syncJourney(stats: {
@@ -164,18 +233,24 @@ export const api = {
     const { data: userAuth } = await supabase.auth.getUser();
     if (!userAuth.user) throw new ApiError('Not authenticated', 401);
 
-    // Get current log
-    const { data: current } = await supabase.from('habit_logs').select('value').eq('habit_id', habitId).eq('date', date).maybeSingle();
-    
-    let newValue = value;
-    if (current) {
-        newValue = Number(current.value) + value;
-        const { error } = await supabase.from('habit_logs').update({ value: newValue }).eq('habit_id', habitId).eq('date', date);
-        if (error) throw new ApiError(error.message, 500);
-    } else {
-        const { error } = await supabase.from('habit_logs').insert([{ habit_id: habitId, user_id: userAuth.user.id, date, value: newValue }]);
-        if (error) throw new ApiError(error.message, 500);
-    }
+    // Fetch current value so we can add to it atomically
+    const { data: current } = await supabase
+      .from('habit_logs')
+      .select('value')
+      .eq('habit_id', habitId)
+      .eq('date', date)
+      .maybeSingle();
+
+    const newValue = current ? Number(current.value) + value : value;
+
+    // Upsert on (habit_id, date) — atomic, race-safe
+    const { error } = await supabase
+      .from('habit_logs')
+      .upsert(
+        { habit_id: habitId, user_id: userAuth.user.id, date, value: newValue },
+        { onConflict: 'habit_id,date' }
+      );
+    if (error) throw new ApiError(error.message, 500);
     return { habitId, date, value: newValue };
   },
 
@@ -183,14 +258,14 @@ export const api = {
     const { data: userAuth } = await supabase.auth.getUser();
     if (!userAuth.user) throw new ApiError('Not authenticated', 401);
 
-    const { data: current } = await supabase.from('habit_logs').select('id').eq('habit_id', habitId).eq('date', date).maybeSingle();
-    if (current) {
-        const { error } = await supabase.from('habit_logs').update({ value }).eq('habit_id', habitId).eq('date', date);
-        if (error) throw new ApiError(error.message, 500);
-    } else {
-        const { error } = await supabase.from('habit_logs').insert([{ habit_id: habitId, user_id: userAuth.user.id, date, value }]);
-        if (error) throw new ApiError(error.message, 500);
-    }
+    // Upsert absolute value — race-safe
+    const { error } = await supabase
+      .from('habit_logs')
+      .upsert(
+        { habit_id: habitId, user_id: userAuth.user.id, date, value },
+        { onConflict: 'habit_id,date' }
+      );
+    if (error) throw new ApiError(error.message, 500);
     return { habitId, date, value };
   },
 
@@ -321,14 +396,14 @@ export const api = {
     const { data: userAuth } = await supabase.auth.getUser();
     if (!userAuth.user) throw new ApiError('Not authenticated', 401);
 
-    const { data: current } = await supabase.from('routine_logs').select('id').eq('routine_id', routineId).eq('date', date).maybeSingle();
-    if (current) {
-        const { error } = await supabase.from('routine_logs').update({ completed }).eq('routine_id', routineId).eq('date', date);
-        if (error) throw new ApiError(error.message, 500);
-    } else {
-        const { error } = await supabase.from('routine_logs').insert([{ routine_id: routineId, user_id: userAuth.user.id, date, completed }]);
-        if (error) throw new ApiError(error.message, 500);
-    }
+    // Upsert on (routine_id, date) — race-safe
+    const { error } = await supabase
+      .from('routine_logs')
+      .upsert(
+        { routine_id: routineId, user_id: userAuth.user.id, date, completed },
+        { onConflict: 'routine_id,date' }
+      );
+    if (error) throw new ApiError(error.message, 500);
   },
 
   async deleteRoutine(routineId: string) {

@@ -2,7 +2,13 @@ import React, { useState } from 'react';
 import { api, ApiError } from '../api';
 import { Zap, Shield, Sparkles, AlertCircle, ArrowUpRight } from 'lucide-react';
 
-const GUEST_CREDENTIALS_KEY = 'habit_mountain_guest_credentials';
+const SIGNUP_RATE_LIMIT_KEY = 'habit_mountain_signup_blocked_until';
+const SIGNUP_COOLDOWN_MS = 10 * 60 * 1000;
+
+function getCooldownMessage(blockedUntil: number): string {
+  const remainingMinutes = Math.max(1, Math.ceil((blockedUntil - Date.now()) / 60000));
+  return 'Signup is cooling down for about ' + remainingMinutes + ' more minute' + (remainingMinutes === 1 ? '' : 's') + '. Please sign in, use guest mode, or wait before creating another account.';
+}
 
 interface AuthPageProps {
   onAuthSuccess: (token: string, user: any) => void;
@@ -17,29 +23,48 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+
     setError(null);
     setLoading(true);
 
-    if (!email || !password) {
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail || !password) {
       setError('Please fill in both email and password fields.');
       setLoading(false);
       return;
     }
 
+    if (!isLogin) {
+      const blockedUntil = Number(localStorage.getItem(SIGNUP_RATE_LIMIT_KEY) || 0);
+      if (blockedUntil > Date.now()) {
+        setError(getCooldownMessage(blockedUntil));
+        setLoading(false);
+        return;
+      }
+    }
+
     try {
-      const normalizedEmail = email.trim().toLowerCase();
       console.log('[AuthPage] Attempting auth with email:', normalizedEmail);
       if (isLogin) {
         const data = await api.login(normalizedEmail, password);
         onAuthSuccess(data.token, data.user);
       } else {
         const data = await api.register(normalizedEmail, password);
+        localStorage.removeItem(SIGNUP_RATE_LIMIT_KEY);
         onAuthSuccess(data.token, data.user);
       }
     } catch (err: any) {
+      if (err instanceof ApiError && err.status === 429) {
+        const blockedUntil = Date.now() + SIGNUP_COOLDOWN_MS;
+        localStorage.setItem(SIGNUP_RATE_LIMIT_KEY, String(blockedUntil));
+        setError(getCooldownMessage(blockedUntil));
+        return;
+      }
+
       const message =
         err instanceof ApiError && err.status === 503
-          ? 'Server storage is not configured. Accounts cannot be saved on this deployment yet.'
+          ? err.message
           : err.message || 'An unexpected authentication failure occurred.';
       setError(message);
     } finally {
@@ -48,31 +73,12 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
   };
 
   const handleDemoLogin = async () => {
+    if (loading) return;
     setError(null);
     setLoading(true);
     try {
-      // Reuse saved guest account so logout + login works for demo users
-      const savedRaw = localStorage.getItem(GUEST_CREDENTIALS_KEY);
-      if (savedRaw) {
-        try {
-          const saved = JSON.parse(savedRaw) as { email: string; password: string };
-          const data = await api.login(saved.email, saved.password);
-          onAuthSuccess(data.token, data.user);
-          return;
-        } catch {
-          localStorage.removeItem(GUEST_CREDENTIALS_KEY);
-        }
-      }
-
-      const randomId = Math.floor(Math.random() * 100000);
-      const demoEmail = `guest_${randomId}@habitmountain.com`;
-      const demoPassword = 'guestPassword123';
-
-      const data = await api.register(demoEmail, demoPassword);
-      localStorage.setItem(
-        GUEST_CREDENTIALS_KEY,
-        JSON.stringify({ email: demoEmail, password: demoPassword })
-      );
+      localStorage.removeItem('habit_mountain_guest_credentials');
+      const data = await api.startGuestSession();
       onAuthSuccess(data.token, data.user);
     } catch (err: any) {
       setError(err.message || 'Failed to initialize guest session.');
@@ -180,7 +186,7 @@ export default function AuthPage({ onAuthSuccess }: AuthPageProps) {
           className="w-full bg-[#161925] hover:bg-[#1E2332] border border-[#242A3D] text-gray-300 font-medium py-3 rounded-xl transition flex items-center justify-center gap-2 cursor-pointer text-sm"
         >
           <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
-          <span>Try Guest Account (saved on this device)</span>
+          <span>Try Guest Session</span>
         </button>
 
         <div className="text-center mt-6">
