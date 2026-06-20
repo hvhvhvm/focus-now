@@ -82,7 +82,12 @@ export default function App() {
   };
 
   // Sign out handle
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      await api.logout();
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
     localStorage.removeItem('habit_mountain_token');
     setToken(null);
     setCurrentUser(null);
