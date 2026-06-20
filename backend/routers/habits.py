@@ -3,10 +3,10 @@ from sqlalchemy.orm import Session
 from typing import List
 import json
 import datetime
-from ..database import get_db
-from ..models import Habit, HabitLog, User
-from ..schemas import HabitCreate, HabitResponse, HabitLogRequest, HabitLogResponse
-from ..auth import get_current_user
+from database import get_db
+from models import Habit, HabitLog, User
+from schemas import HabitCreate, HabitResponse, HabitLogRequest, HabitLogResponse
+from auth import get_current_user
 
 router = APIRouter(prefix="/api/habits", tags=["habits"])
 

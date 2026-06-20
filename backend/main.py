@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .database import engine, Base
-from .routers import auth, habits, routines, stats
+from database import engine, Base
+from routers import auth, habits, routines, stats
 
 # Create SQLAlchemy Database tables (if not utilizing Alembic manual migrations)
 Base.metadata.create_all(bind=engine)
