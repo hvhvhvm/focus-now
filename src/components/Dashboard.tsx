@@ -142,6 +142,7 @@ export default function Dashboard({
   const [timeframeFilter, setTimeframeFilter] = useState<'All' | 'Morning' | 'Evening' | 'Night'>('All');
   const [focusRoutineId, setFocusRoutineId] = useState<string | null>(null);
   const [showAllQuickHabits, setShowAllQuickHabits] = useState(false);
+  const [collapsedRoutines, setCollapsedRoutines] = useState<Set<string>>(new Set());
 
   const journeyStartDate = localStorage.getItem('habit_mountain_journey_start_date');
   let activeGrowthValue = 0.0;
@@ -507,408 +508,232 @@ export default function Dashboard({
       </div>
 
       {/* 3. Quick Habit Logger with points rewarding system */}
-      <div id="quick-habit-logger-section" className="bg-[#14161F]/90 border border-[#232734]/80 p-6 rounded-2xl shadow-lg relative overflow-hidden group/logger duration-300 transition-all hover:border-[#12B886]/20 hover:shadow-[0_0_35px_rgba(18,184,134,0.03)]">
+      <div id="quick-habit-logger-section" className="bg-[#14161F]/90 border border-[#232734]/80 p-3 md:p-6 rounded-2xl shadow-lg relative overflow-hidden group/logger duration-300 transition-all hover:border-[#12B886]/20 hover:shadow-[0_0_35px_rgba(18,184,134,0.03)]">
         {/* Dynamic backdrop glows */}
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-gradient-to-r from-purple-500/5 to-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6 relative z-10">
-          <div className="text-left">
-            <h3 className="text-lg font-bold text-white font-sans flex items-center">
-              <CheckCircle2 className="w-5 h-5 text-[#12B886] mr-2 animate-pulse" />
-              Quick Habit Logger
-            </h3>
-            <p className="text-xs text-gray-400 font-sans mt-0.5">
-              Log progress increment values directly from this helper dashboard list.
-            </p>
-          </div>
-          <span className="text-xs text-gray-405 font-mono tracking-widest font-semibold bg-[#1D212F] px-3 py-1 rounded-lg border border-[#2C3246]/50">
-            ⚡ 1-TAP CHECKLIST
+        {/* Header: single compact row */}
+        <div className="flex items-center justify-between mb-3 relative z-10">
+          <h3 className="text-sm font-bold text-white font-sans flex items-center">
+            <CheckCircle2 className="w-4 h-4 text-[#12B886] mr-1.5 animate-pulse" />
+            Quick Habit Logger
+          </h3>
+          <span className="text-[10px] text-gray-400 font-mono tracking-widest font-semibold bg-[#1D212F] px-2 py-0.5 rounded border border-[#2C3246]/50">
+            ⚡ 1-TAP
           </span>
         </div>
 
         {(() => {
-          const filteredHabitsForCounts = habits.filter(item => {
-            if (focusRoutineId) {
-              const activeRt = routines.find(r => r.id === focusRoutineId);
-              return activeRt ? activeRt.habitIds.includes(item.id) : false;
-            } else {
-              return !item.routineId;
-            }
-          });
+          // All habits filtered by timeframe
+          const allHabits = habits;
+          const habitMatchesTimeframe = (h: Habit) =>
+            timeframeFilter === 'All' || getHabitTimeframe(h, routines) === timeframeFilter;
 
-          const allCount = filteredHabitsForCounts.length;
-          const morningCount = filteredHabitsForCounts.filter(h => getHabitTimeframe(h, routines) === 'Morning').length;
-          const eveningCount = filteredHabitsForCounts.filter(h => getHabitTimeframe(h, routines) === 'Evening').length;
-          const nightCount = filteredHabitsForCounts.filter(h => getHabitTimeframe(h, routines) === 'Night').length;
+          // Counts for filter tabs (across all habits)
+          const allCount = allHabits.length;
+          const morningCount = allHabits.filter(h => getHabitTimeframe(h, routines) === 'Morning').length;
+          const eveningCount = allHabits.filter(h => getHabitTimeframe(h, routines) === 'Evening').length;
+          const nightCount = allHabits.filter(h => getHabitTimeframe(h, routines) === 'Night').length;
 
-          const displayedHabits = filteredHabitsForCounts.filter(item => {
-            if (timeframeFilter === 'All') return true;
-            return getHabitTimeframe(item, routines) === timeframeFilter;
-          });
-
-          const focusActiveRoutine = focusRoutineId ? routines.find(r => r.id === focusRoutineId) : null;
-          let focusRoutineProgress = 0;
-          let focusRoutineDoneCount = 0;
-          let focusRoutineTotalCount = 0;
-          if (focusActiveRoutine) {
-            const rHabits = habits.filter(h => focusActiveRoutine.habitIds.includes(h.id));
-            focusRoutineTotalCount = rHabits.length;
-            focusRoutineDoneCount = rHabits.filter(h => (h.history[dateToday] || 0) >= h.target).length;
-            focusRoutineProgress = focusRoutineTotalCount > 0 ? Math.min(100, Math.round((focusRoutineDoneCount / focusRoutineTotalCount) * 100)) : 0;
-          }
+          // Standalone habits (not in any routine), filtered by timeframe
+          const standaloneHabits = allHabits.filter(h => !h.routineId && habitMatchesTimeframe(h));
 
           const getCategoryConfigLocal = (category: Category) => {
             switch (category) {
-              case 'Fitness':
-                return { color: '#12B886', icon: Dumbbell };
-              case 'Reading':
-                return { color: '#FD7E14', icon: BookOpen };
-              case 'Productivity':
-                return { color: '#FCC419', icon: Zap };
-              case 'Health':
-                return { color: '#228BE6', icon: Brain };
-              case 'Mindfulness':
-                return { color: '#845EF7', icon: Brain };
-              case 'Study':
-                return { color: '#20C997', icon: Sparkles };
-              case 'Social':
-                return { color: '#B54708', icon: Navigation };
-              default:
-                return { color: '#868E96', icon: Sparkles };
+              case 'Fitness': return { color: '#12B886', icon: Dumbbell };
+              case 'Reading': return { color: '#FD7E14', icon: BookOpen };
+              case 'Productivity': return { color: '#FCC419', icon: Zap };
+              case 'Health': return { color: '#228BE6', icon: Brain };
+              case 'Mindfulness': return { color: '#845EF7', icon: Brain };
+              case 'Study': return { color: '#20C997', icon: Sparkles };
+              case 'Social': return { color: '#B54708', icon: Navigation };
+              default: return { color: '#868E96', icon: Sparkles };
             }
           };
 
+          const HabitCard = ({ item }: { item: Habit }) => {
+            const progressVal = item.history[dateToday] || 0;
+            const percentage = Math.min(100, Math.round((progressVal / item.target) * 100));
+            const isCompleted = progressVal >= item.target;
+            const remaining = Math.max(0, item.target - progressVal);
+            const config = getCategoryConfigLocal(item.category);
+            const IconComp = config.icon;
+            return (
+              <div
+                style={{ '--hover-glow': `${config.color}15`, '--card-border': `${config.color}35` } as React.CSSProperties}
+                className="relative bg-[#12141C]/90 hover:bg-[#151722] border border-[#232734]/50 hover:border-[var(--card-border)] rounded-[16px] transition-all duration-300 flex items-center pl-6 pr-3 py-2.5 gap-2.5 overflow-hidden group shadow-sm hover:shadow-[0_0_20px_var(--hover-glow)]"
+              >
+                <div className="absolute inset-0 pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity duration-300"
+                  style={{ background: `radial-gradient(ellipse 180px 80px at 0% 50%, ${config.color}12, transparent)` }} />
+                <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-[16px]" style={{ backgroundColor: config.color }} />
+                {/* Icon */}
+                <div className="h-8 w-8 rounded-full flex items-center justify-center shrink-0 border relative z-10 group-hover:scale-105 transition-transform duration-300"
+                  style={{ backgroundColor: `${config.color}15`, borderColor: `${config.color}25`, color: config.color }}>
+                  <IconComp className="w-3.5 h-3.5" />
+                </div>
+                {/* Name + meta */}
+                <div className="flex flex-col min-w-0 shrink-0 w-[85px] xs:w-[105px] relative z-10 text-left">
+                  <h4 className="text-[13px] font-bold text-white font-sans tracking-tight truncate">{item.name}</h4>
+                  <div className="flex items-center gap-1 text-[9px] text-gray-500 mt-0.5">
+                    <span className="font-semibold truncate" style={{ color: config.color }}>{item.category}</span>
+                    <span className="text-gray-700">·</span>
+                    <span className="flex items-center text-[#FCC419] font-semibold shrink-0">
+                      <Zap className="w-2 h-2 mr-0.5 fill-[#FCC419]" />{item.routineId ? 0 : item.points}pts
+                    </span>
+                  </div>
+                </div>
+                {/* Progress bar */}
+                <div className="flex-1 min-w-0 relative z-10">
+                  <div className="flex justify-between items-center text-[9px] font-bold mb-1">
+                    <span style={{ color: config.color }}>{progressVal}/{item.target} <span className="text-gray-600 font-normal">{item.unit}</span></span>
+                    <span className="text-gray-500 font-mono">{percentage}%</span>
+                  </div>
+                  <div className="w-full h-1.5 bg-[#171924] rounded-full overflow-hidden border border-gray-800/40">
+                    <div className="h-full transition-all duration-500 rounded-full"
+                      style={{ width: `${percentage}%`, backgroundColor: config.color, boxShadow: `0 0 6px ${config.color}` }} />
+                  </div>
+                </div>
+                {/* Circle complete */}
+                <div className="shrink-0 relative z-10">
+                  {isCompleted ? (
+                    <div className="h-8 w-8 rounded-full flex items-center justify-center bg-[#12B886] animate-pulse text-black"
+                      style={{ filter: 'drop-shadow(0 0 5px rgba(18,184,134,0.6))' }}>
+                      <Check className="w-3.5 h-3.5 stroke-[3px]" />
+                    </div>
+                  ) : (
+                    <button onClick={() => handleQuickLog(item.id, remaining)}
+                      className="h-8 w-8 rounded-full border-2 flex items-center justify-center transition-all duration-300 cursor-pointer group/circle active:scale-90"
+                      style={{ borderColor: '#202434', backgroundColor: 'transparent' }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = config.color; e.currentTarget.style.backgroundColor = `${config.color}15`; e.currentTarget.style.boxShadow = `0 0 8px ${config.color}35`; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = '#202434'; e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.boxShadow = 'none'; }}>
+                      <Check className="w-3.5 h-3.5 stroke-[3px] opacity-0 group-hover/circle:opacity-100 transition-opacity duration-200" style={{ color: config.color }} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          };
+
+          const totalVisible =
+            routines.reduce((acc, rt) => {
+              const filtered = habits.filter(h => rt.habitIds.includes(h.id) && habitMatchesTimeframe(h));
+              return acc + filtered.length;
+            }, 0) + standaloneHabits.length;
+
           return (
-            <div className="space-y-6">
-              {/* Filter Tabs Row */}
-              <div className="flex flex-wrap items-center gap-2 border-b border-gray-800 pb-4">
+            <div className="space-y-3">
+              {/* ── Filter Tabs ── */}
+              <div className="flex items-center gap-1.5 border-b border-gray-800/60 pb-3 overflow-x-auto scrollbar-none">
                 {[
-                  { value: 'All', label: 'All habits', count: allCount, icon: '', activeColor: 'bg-[#12B886]/10 text-[#12B886] border-[#12B886]/20' },
+                  { value: 'All', label: 'All', count: allCount, icon: '', activeColor: 'bg-[#12B886]/10 text-[#12B886] border-[#12B886]/20' },
                   { value: 'Morning', label: 'Morning', count: morningCount, icon: '☀️', activeColor: 'bg-[#FCC419]/10 text-[#FCC419] border-[#FCC419]/30' },
                   { value: 'Evening', label: 'Evening', count: eveningCount, icon: '🌆', activeColor: 'bg-[#FD7E14]/10 text-[#FD7E14] border-[#FD7E14]/30' },
                   { value: 'Night', label: 'Night', count: nightCount, icon: '🌙', activeColor: 'bg-[#845EF7]/10 text-[#845EF7] border-[#845EF7]/30' },
-                ].map((tab) => {
+                ].map(tab => {
                   const isActive = timeframeFilter === tab.value;
                   return (
-                    <button
-                      key={tab.value}
-                      onClick={() => setTimeframeFilter(tab.value as any)}
-                      className={`flex items-center space-x-2 px-4 py-2 rounded-full text-xs font-semibold cursor-pointer transition select-none ${
-                        isActive
-                          ? 'border ' + tab.activeColor
-                          : 'bg-[#12141C] border border-[#232734] text-gray-400 hover:text-white hover:bg-[#1E212E]'
-                      }`}
-                    >
-                      <span className="flex items-center gap-1">
-                        {tab.icon && <span>{tab.icon}</span>}
-                        <span>{tab.label}</span>
-                      </span>
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded font-extrabold bg-[#1A1D28] text-gray-500 border border-gray-800">
-                        {tab.count}
-                      </span>
+                    <button key={tab.value} onClick={() => setTimeframeFilter(tab.value as any)}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold cursor-pointer transition select-none shrink-0 ${
+                        isActive ? 'border ' + tab.activeColor : 'bg-[#12141C] border border-[#232734] text-gray-400 hover:text-white hover:bg-[#1E212E]'
+                      }`}>
+                      {tab.icon && <span className="text-[11px]">{tab.icon}</span>}
+                      <span>{tab.label}</span>
+                      <span className="text-[9px] font-mono font-extrabold bg-[#1A1D28] text-gray-500 border border-gray-800 px-1 rounded">{tab.count}</span>
                     </button>
                   );
                 })}
               </div>
 
-              {/* Timeblock Routines Section inside the Logger Card */}
-              {(() => {
-                const timeframeRoutines = routines.filter(r => {
-                  if (timeframeFilter === 'All') return true;
-                  return r.timeBlock === timeframeFilter;
-                });
+              {/* ── Grouped Habit List ── */}
+              {totalVisible === 0 ? (
+                <div className="bg-[#12141C]/50 border border-dashed border-gray-800 rounded-xl py-10 text-center">
+                  <CheckCircle2 className="w-7 h-7 text-[#12B886] mx-auto mb-2 animate-pulse" />
+                  <h4 className="text-sm font-bold text-gray-300">All clear!</h4>
+                  <p className="text-xs text-gray-500 mt-1">No habits for the {timeframeFilter === 'All' ? 'day' : `${timeframeFilter.toLowerCase()} block`}.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {/* Routine sections */}
+                  {routines.map(rt => {
+                    const rtHabits = habits.filter(h => rt.habitIds.includes(h.id) && habitMatchesTimeframe(h));
+                    if (rtHabits.length === 0) return null;
 
-                if (timeframeRoutines.length === 0) return null;
+                    const doneCount = rtHabits.filter(h => (h.history[dateToday] || 0) >= h.target).length;
+                    const totalCount = rtHabits.length;
+                    const rtProgress = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+                    const isCollapsed = collapsedRoutines.has(rt.id);
+                    const allDone = doneCount === totalCount;
 
-                return (
-                  <div className="bg-[#12141C]/30 border border-gray-800/60 rounded-xl p-4 space-y-2.5 text-left">
-                    <div className="text-[10px] font-mono text-purple-400 uppercase tracking-widest font-semibold flex items-center">
-                      <Navigation className="w-3.5 h-3.5 mr-1" />
-                      {timeframeFilter === 'All' ? 'Routine Filters' : `Active ${timeframeFilter} block routines`}
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {timeframeRoutines.map(rt => {
-                        const rHabits = habits.filter(h => rt.habitIds.includes(h.id));
-                        const doneCount = rHabits.filter(h => (h.history[dateToday] || 0) >= h.target).length;
-                        const totalCount = rHabits.length;
-                        const progress = totalCount > 0 ? Math.min(100, Math.round((doneCount / totalCount) * 100)) : 0;
-                        const isFocused = focusRoutineId === rt.id;
-
-                        return (
-                          <div
-                            key={rt.id}
-                            onClick={() => setFocusRoutineId(isFocused ? null : rt.id)}
-                            className={`p-3 rounded-xl border text-left cursor-pointer transition select-none ${
-                              isFocused
-                                ? 'bg-[#1E1B29] border-purple-500/40'
-                                : 'bg-[#12141C] border-[#232734] hover:border-[#303548]'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="text-xs font-bold text-white block truncate">
-                                🔄 {rt.name}
-                              </span>
-                              <span className="text-xs font-mono font-bold text-purple-400">
-                                {progress}%
-                              </span>
-                            </div>
-
-                            {/* Progress bar */}
-                            <div className="w-full h-1 bg-gray-800 rounded-full overflow-hidden mt-2">
-                              <div
-                                className="h-full bg-purple-500 transition-all duration-300"
-                                style={{ width: `${progress}%` }}
-                              />
-                            </div>
-
-                            <div className="text-[10px] text-gray-500 mt-2 flex items-center justify-between font-mono">
-                              <span>{doneCount} / {totalCount} completed</span>
-                              {isFocused && (
-                                <span className="text-purple-400 font-semibold text-[9px] uppercase tracking-wider">Active Filter</span>
+                    return (
+                      <div key={rt.id} className="rounded-xl border border-[#845EF7]/20 overflow-hidden bg-[#0F1018]">
+                        {/* Routine Header — tap to collapse */}
+                        <button
+                          onClick={() => setCollapsedRoutines(prev => {
+                            const next = new Set(prev);
+                            next.has(rt.id) ? next.delete(rt.id) : next.add(rt.id);
+                            return next;
+                          })}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-[#845EF7]/5 transition-colors duration-200 cursor-pointer select-none"
+                        >
+                          {/* Purple left accent */}
+                          <div className="w-1 h-6 rounded-full bg-[#845EF7] shrink-0" />
+                          {/* Routine name + timeblock */}
+                          <div className="flex-1 min-w-0 text-left">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[11px] font-bold text-white truncate">🔄 {rt.name}</span>
+                              {rt.timeBlock && (
+                                <span className="text-[8px] font-mono text-purple-400 bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
+                                  {rt.timeBlock}
+                                </span>
+                              )}
+                              {allDone && (
+                                <span className="text-[8px] font-mono text-[#12B886] bg-[#12B886]/10 border border-[#12B886]/20 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 animate-pulse">
+                                  ✓ Done
+                                </span>
                               )}
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })()}
-
-              {/* Routines Shortcut Pills Row */}
-              <div className="flex flex-wrap items-center gap-2 text-left select-none">
-                <span className="text-[10px] font-mono text-gray-500 uppercase tracking-wider font-bold mr-2">
-                  ROUTINES:
-                </span>
-                <button
-                  onClick={() => setFocusRoutineId(null)}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-semibold cursor-pointer transition ${
-                    focusRoutineId === null
-                      ? 'bg-[#845EF7]/10 border border-[#845EF7]/30 text-[#845EF7]'
-                      : 'bg-[#12141C] border border-[#232734] text-gray-400 hover:text-white'
-                  }`}
-                >
-                  All habits
-                </button>
-                {routines.map((rt) => {
-                  const isActive = focusRoutineId === rt.id;
-                  const rHabits = habits.filter(h => rt.habitIds.includes(h.id));
-                  const doneCount = rHabits.filter(h => (h.history[dateToday] || 0) >= h.target).length;
-                  const totalCount = rHabits.length;
-                  const p = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
-                  return (
-                    <button
-                      key={rt.id}
-                      onClick={() => {
-                        setFocusRoutineId(rt.id);
-                        setTimeframeFilter('All');
-                      }}
-                      className={`flex items-center space-x-1 px-3.5 py-1.5 rounded-full text-xs font-semibold cursor-pointer transition ${
-                        isActive
-                          ? 'bg-[#845EF7]/10 border border-[#845EF7]/30 text-[#845EF7]'
-                          : 'bg-[#12141C] border border-[#232734] text-gray-400 hover:text-white'
-                      }`}
-                    >
-                      <span>{rt.name}</span>
-                      <span className="text-[9px] font-mono px-1 rounded bg-[#845EF7]/20 text-[#845EF7]">
-                        {p}%
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {focusActiveRoutine && (
-                <div className="bg-purple-950/10 border border-purple-900/30 rounded-xl p-4 relative text-left animate-fade-in flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="space-y-1 pl-1 flex-1">
-                    <span className="text-[9px] font-mono text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/10 uppercase tracking-widest font-semibold">
-                      Routine Active
-                    </span>
-                    <h4 className="text-sm font-bold text-white font-sans mt-1">
-                      {focusActiveRoutine.name}
-                    </h4>
-                    <p className="text-xs text-gray-400 leading-relaxed font-sans max-w-lg">
-                      Complete all routine habits to earn <strong className="text-purple-400">+{focusActiveRoutine.points} XP</strong> completion bonus!
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-4 pr-1 shrink-0 justify-between sm:justify-end">
-                    <div className="text-left sm:text-right font-sans">
-                      <span className="text-[10px] text-gray-500 block font-semibold">Progress</span>
-                      <span className="text-xs font-bold text-white font-mono">{focusRoutineDoneCount} / {focusRoutineTotalCount} done</span>
-                    </div>
-                    <button
-                      onClick={() => setFocusRoutineId(null)}
-                      className="px-2.5 py-1.5 bg-[#1C1F2E] hover:bg-[#252A40] border border-gray-800 rounded-lg text-xs font-mono font-bold text-gray-400 hover:text-white transition cursor-pointer"
-                    >
-                      Clear
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Stacked wide strips (Habit Listing) */}
-              <div className="flex flex-col space-y-3 animate-fade-in">
-                {displayedHabits.length > 0 ? (
-                  (() => {
-                    const habitsToRender = showAllQuickHabits ? displayedHabits : displayedHabits.slice(0, 5);
-                    return (
-                      <>
-                        {habitsToRender.map((item) => {
-                          const progressVal = item.history[dateToday] || 0;
-                          const percentage = Math.min(100, Math.round((progressVal / item.target) * 100));
-                          const isCompleted = progressVal >= item.target;
-                          const remaining = Math.max(0, item.target - progressVal);
-                          const config = getCategoryConfigLocal(item.category);
-                          const IconComp = config.icon;
-
-                          return (
-                            <div
-                              key={item.id}
-                              style={{ 
-                                '--hover-glow': `${config.color}15`,
-                                '--card-border': `${config.color}35`
-                              } as React.CSSProperties}
-                              className="relative bg-[#12141C]/90 hover:bg-[#151722] border border-[#232734]/50 hover:border-[var(--card-border)] rounded-[20px] transition-all duration-300 flex flex-col md:flex-row md:items-center p-4 pl-7 pr-5 gap-4 overflow-hidden group shadow-sm hover:shadow-[0_0_20px_var(--hover-glow)]"
-                            >
-                              {/* Ambient gradient left-side fade */}
-                              <div 
-                                className="absolute inset-0 pointer-events-none transition-all duration-300 opacity-60 group-hover:opacity-100"
-                                style={{
-                                  background: `radial-gradient(ellipse 240px 140px at 0% 50%, ${config.color}14, transparent)`
-                                }}
-                              />
-
-                              {/* Left side accent vertical line */}
-                              <div className="absolute left-0 top-0 bottom-0 w-1.5 rounded-l-[20px]" style={{ backgroundColor: config.color }} />
-
-                              {/* Left part: icon, details */}
-                              <div className="flex items-center space-x-4 w-full md:w-auto relative z-10 text-left">
-                                <div 
-                                  className="h-12 w-12 rounded-full flex items-center justify-center shrink-0 border transition-all duration-300 group-hover:scale-105 shadow-[0_0_12px_rgba(0,0,0,0.2)]"
-                                  style={{ 
-                                    backgroundColor: `${config.color}15`, 
-                                    borderColor: `${config.color}25`,
-                                    color: config.color,
-                                    boxShadow: `0 0 12px ${config.color}18`
-                                  }}
-                                >
-                                  <IconComp className="w-5 h-5" />
-                                </div>
-                                <div className="space-y-1 text-left max-w-sm flex-1">
-                                  <div className="flex items-center space-x-2 flex-wrap">
-                                    <h4 className="text-base font-bold text-white font-sans tracking-tight">
-                                      {item.name}
-                                    </h4>
-                                    <span className="text-[10px] font-mono font-bold tracking-wider text-gray-500 border border-gray-800/80 rounded px-1.5 py-0.5 uppercase">
-                                      {item.repeat || 'DAILY'}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center space-x-2 text-gray-500 text-xs flex-wrap">
-                                    <span style={{ color: config.color }} className="font-semibold">
-                                      {item.category}
-                                    </span>
-                                    <span className="text-gray-700">&bull;</span>
-                                    <span>{item.timeOfDay || 'Anytime'}</span>
-                                    <span className="text-gray-700">&bull;</span>
-                                    <span className="flex items-center text-[#FCC419] font-semibold">
-                                      <Zap className="w-3.5 h-3.5 mr-0.5 fill-[#FCC419]" />
-                                      {item.routineId ? 0 : item.points} pts
-                                    </span>
-                                  </div>
-                                </div>
+                            {/* Mini progress bar */}
+                            <div className="flex items-center gap-1.5 mt-1">
+                              <div className="flex-1 h-1 bg-gray-800 rounded-full overflow-hidden">
+                                <div className="h-full bg-[#845EF7] rounded-full transition-all duration-500"
+                                  style={{ width: `${rtProgress}%`, boxShadow: '0 0 4px #845EF7' }} />
                               </div>
-
-                              {/* Mid part: Progress bar */}
-                              <div className="flex-1 max-w-md w-full md:mx-6 space-y-1.5 text-left relative z-10">
-                                <div className="flex justify-between items-center text-xs font-bold">
-                                  <span style={{ color: config.color }} className="font-bold">
-                                    {progressVal} / {item.target} <span className="text-[10px] text-gray-500 font-normal">{item.unit}</span>
-                                  </span>
-                                  <span className="text-gray-400 font-mono font-bold">{percentage}%</span>
-                                </div>
-                                <div className="w-full h-2 bg-[#171924] rounded-full overflow-hidden block border border-gray-800/40 shadow-inner">
-                                  <div
-                                    className="h-full transition-all duration-500 rounded-full"
-                                    style={{ 
-                                      width: `${percentage}%`, 
-                                      backgroundColor: config.color,
-                                      boxShadow: `0 0 12px ${config.color}, 0 0 4px ${config.color}`
-                                    }}
-                                  />
-                                </div>
-                              </div>
-
-                              {/* Right part: Complete status / buttons */}
-                              <div className="flex items-center space-x-3 shrink-0 justify-between md:justify-end w-full md:w-auto relative z-10 border-t border-gray-800/40 pt-3 md:pt-0 md:border-0">
-                                <div className="flex items-center space-x-2 w-full md:w-auto">
-                                  <button
-                                    onClick={() => handleQuickLog(item.id, Math.ceil(item.target / 3))}
-                                    className="flex-1 md:flex-none px-4 py-3 min-h-[44px] flex items-center justify-center bg-[#12141C] hover:bg-[#1E212E] border border-[#232734] rounded-xl text-xs font-mono font-bold text-gray-400 hover:text-white transition cursor-pointer select-none active:scale-95"
-                                  >
-                                    +{Math.ceil(item.target / 3)}
-                                  </button>
-                                  <button
-                                    onClick={() => handleQuickLog(item.id, 1)}
-                                    className="flex-1 md:flex-none px-4 py-3 min-h-[44px] flex items-center justify-center bg-[#12141C] hover:bg-[#1E212E] border border-[#232734] rounded-xl text-xs font-mono font-bold text-gray-400 hover:text-white transition cursor-pointer select-none active:scale-95"
-                                  >
-                                    +1
-                                  </button>
-                                </div>
-
-                                {isCompleted ? (
-                                  <div className="text-black h-11 w-11 rounded-full flex items-center justify-center shadow-lg cursor-default shrink-0 bg-[#12B886] transition-all duration-300 animate-pulse" style={{ filter: 'drop-shadow(0 0 6px rgba(18, 184, 134, 0.65))' }}>
-                                    <Check className="w-5 h-5 stroke-[3px]" />
-                                  </div>
-                                ) : (
-                                  <button
-                                    onClick={() => handleQuickLog(item.id, remaining)}
-                                    className="h-11 w-11 rounded-full border-2 flex items-center justify-center transition-all duration-300 cursor-pointer shrink-0 group/circle active:scale-95"
-                                    style={{
-                                      borderColor: '#202434',
-                                      backgroundColor: 'transparent'
-                                    }}
-                                    onMouseEnter={(e) => {
-                                      e.currentTarget.style.borderColor = config.color;
-                                      e.currentTarget.style.backgroundColor = `${config.color}15`;
-                                      e.currentTarget.style.boxShadow = `0 0 10px ${config.color}35`;
-                                    }}
-                                    onMouseLeave={(e) => {
-                                      e.currentTarget.style.borderColor = '#202434';
-                                      e.currentTarget.style.backgroundColor = 'transparent';
-                                      e.currentTarget.style.boxShadow = 'none';
-                                    }}
-                                  >
-                                    <Check className="w-5 h-5 stroke-[3px] opacity-0 group-hover/circle:opacity-100 transition-all duration-200" style={{ color: config.color }} />
-                                  </button>
-                                )}
-                              </div>
+                              <span className="text-[9px] font-mono text-purple-400 shrink-0">{doneCount}/{totalCount}</span>
                             </div>
-                          );
-                        })}
-
-                        {displayedHabits.length > 5 && (
-                          <div className="flex justify-center pt-1">
-                            <button
-                              onClick={() => setShowAllQuickHabits(!showAllQuickHabits)}
-                              className="px-4 py-2 bg-[#12141C] hover:bg-[#1E212E] text-xs font-semibold text-gray-400 hover:text-white rounded-lg border border-gray-800 hover:border-gray-700 transition cursor-pointer"
-                            >
-                              {showAllQuickHabits ? 'Show less' : `Show all active habits (${displayedHabits.length})`}
-                            </button>
+                          </div>
+                          {/* XP badge + chevron */}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="text-[9px] font-mono font-bold text-[#FCC419] bg-[#FCC419]/10 border border-[#FCC419]/20 px-1.5 py-0.5 rounded">
+                              +{rt.points}XP
+                            </span>
+                            <svg className={`w-3.5 h-3.5 text-gray-500 transition-transform duration-200 ${isCollapsed ? '' : 'rotate-180'}`}
+                              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                              <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </div>
+                        </button>
+                        {/* Habit cards inside routine */}
+                        {!isCollapsed && (
+                          <div className="flex flex-col gap-1.5 px-2 pb-2">
+                            {rtHabits.map(item => <HabitCard key={item.id} item={item} />)}
                           </div>
                         )}
-                      </>
+                      </div>
                     );
-                  })()
-                ) : (
-                  <div className="bg-[#12141C]/50 border border-dashed border-gray-800 rounded-xl py-12 text-center">
-                    <CheckCircle2 className="w-8 h-8 text-[#12B886] mx-auto mb-2 animate-pulse" />
-                    <h4 className="text-sm font-bold text-gray-300">All habits cleared!</h4>
-                    <p className="text-xs text-gray-500 mt-1">
-                      No active items remaining for {timeframeFilter === 'All' ? 'today' : `${timeframeFilter.toLowerCase()} block`}.
-                    </p>
-                  </div>
-                )}
-              </div>
+                  })}
+
+                  {/* Standalone habits (no routine) */}
+                  {standaloneHabits.length > 0 && (
+                    <div className="space-y-1.5">
+                      {routines.length > 0 && (
+                        <div className="text-[9px] font-mono text-gray-600 uppercase tracking-widest font-bold px-1 pt-1">
+                          Individual Habits
+                        </div>
+                      )}
+                      {standaloneHabits.map(item => <HabitCard key={item.id} item={item} />)}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           );
         })()}
