@@ -209,7 +209,7 @@ export default function CategoryDetailView({
                     {/* Points Allocation Badge */}
                     <span className="bg-[#FCC419]/10 text-[#FCC419] border border-[#FCC419]/20 text-[9px] font-mono font-extrabold px-1.5 py-0.5 rounded flex items-center">
                       <Zap className="w-3 h-3 mr-0.5" />
-                      {item.points}
+                      {item.routineId ? 0 : item.points}
                     </span>
                     {/* Schedule block badge */}
                     <span className="bg-[#1C202E] border border-[#2C3145] text-gray-400 text-[9px] font-mono px-2 py-0.5 rounded flex items-center">

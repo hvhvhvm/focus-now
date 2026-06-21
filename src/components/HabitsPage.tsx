@@ -185,8 +185,12 @@ export default function HabitsPage({
             const habitObj = habits.find(h => h.id === activeTimerId);
             if (habitObj) {
               onLogHabit(habitObj.id, habitObj.target);
+              if (habitObj.routineId) {
+                toast.success(`Focus session complete for "${habitObj.name}"!`);
+              } else {
+                toast.success(`Focus session complete for "${habitObj.name}"! +${habitObj.points} pts earned!`);
+              }
             }
-            toast.success(`Focus session complete for "${habitObj?.name}"! +${habitObj?.points} pts earned!`);
             return 0;
           }
           return prev - 1;
@@ -692,8 +696,8 @@ export default function HabitsPage({
                               </span>
 
                               {/* Points Reward badge — use Lucide icon to avoid mojibake */}
-                              <span className="flex items-center px-1.5 py-0.5 border border-[#FCC419]/25 bg-[#FCC419]/05 text-[#FCC419] rounded">
-                                <Zap className="w-3 h-3 mr-0.5 fill-[#FCC419]" /> {item.points}
+                               <span className="flex items-center px-1.5 py-0.5 border border-[#FCC419]/25 bg-[#FCC419]/05 text-[#FCC419] rounded">
+                                <Zap className="w-3 h-3 mr-0.5 fill-[#FCC419]" /> {item.routineId ? 0 : item.points}
                               </span>
 
 

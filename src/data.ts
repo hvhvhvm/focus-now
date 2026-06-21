@@ -54,6 +54,7 @@ export const getScheduledHabits = (habits: Habit[], dateStr: string): Habit[] =>
 };
 
 export const calculateHabitLogPoints = (habit: Habit, value: number): number => {
+  if (habit.routineId) return 0;
   if (!Number.isFinite(value) || value <= 0 || habit.target <= 0) return 0;
   if (value >= habit.target) return habit.points + 5;
   return Math.min(habit.points, Math.max(1, Math.round((value / habit.target) * habit.points)));

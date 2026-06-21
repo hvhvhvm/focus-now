@@ -122,12 +122,21 @@ export default function Dashboard({
   const totalTodayCount = habits.length;
   const overallTodayProgress = totalTodayCount > 0 ? Math.round((doneTodayCount / totalTodayCount) * 100) : 0;
 
-  const totalPotentialPoints = habits.reduce((acc, curr) => acc + curr.points, 0);
-  const earnedPointsToday = habits.reduce((acc, curr) => {
-    const todayLog = curr.history[dateToday] || 0;
-    const progressDonePercent = Math.min(1.0, todayLog / curr.target);
-    return acc + Math.round(progressDonePercent * curr.points);
-  }, 0);
+  const totalPotentialPoints =
+    habits.reduce((acc, curr) => acc + (curr.routineId ? 0 : curr.points), 0) +
+    routines.reduce((acc, curr) => acc + curr.points, 0);
+
+  const earnedPointsToday =
+    habits.reduce((acc, curr) => {
+      if (curr.routineId) return acc;
+      const todayLog = curr.history[dateToday] || 0;
+      const progressDonePercent = Math.min(1.0, todayLog / curr.target);
+      return acc + Math.round(progressDonePercent * curr.points);
+    }, 0) +
+    routines.reduce((acc, curr) => {
+      const completed = curr.completedHistory?.[dateToday] || false;
+      return acc + (completed ? curr.points : 0);
+    }, 0);
 
   const [quickVals, setQuickVals] = useState<{ [key: string]: string }>({});
   const [timeframeFilter, setTimeframeFilter] = useState<'All' | 'Morning' | 'Evening' | 'Night'>('All');
@@ -244,15 +253,53 @@ export default function Dashboard({
   }
 
   return (
-    <div className="space-y-8 max-w-5xl mx-auto">
-      {/* 1. Header Section - Logo and Circular Gauge */}
-      <header className="flex flex-col md:flex-row items-start md:items-center justify-between pb-6 border-b border-[#1A1D24] gap-6">
+    <div className="space-y-4 md:space-y-8 max-w-5xl mx-auto">
+      {/* 1a. Mobile-only compact header */}
+      <header className="md:hidden flex items-center justify-between py-1 border-b border-[#1A1D24]">
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-3.5 h-3.5 text-[#FCC419] animate-spin-slow shrink-0" />
+          <h1 className="text-base font-extrabold tracking-tight text-white font-sans">
+            Habits
+          </h1>
+          <span className="text-[10px] font-mono text-gray-500 hidden xs:inline">
+            {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 bg-[#12B886]/10 border border-[#12B886]/25 rounded-full px-2.5 py-1">
+            <div className="relative w-4 h-4 shrink-0">
+              <svg className="absolute w-full h-full -rotate-90" viewBox="0 0 20 20">
+                <circle cx="10" cy="10" r="8" className="stroke-gray-800" strokeWidth="2.5" fill="transparent" />
+                <circle
+                  cx="10" cy="10" r="8"
+                  stroke="#12B886" strokeWidth="2.5" fill="transparent"
+                  strokeDasharray={2 * Math.PI * 8}
+                  strokeDashoffset={2 * Math.PI * 8 * (1 - overallTodayProgress / 100)}
+                  style={{ filter: 'drop-shadow(0 0 3px rgba(18,184,134,0.6))' }}
+                />
+              </svg>
+            </div>
+            <span className="text-xs font-mono font-bold text-[#12B886]">{overallTodayProgress}%</span>
+            <span className="text-[10px] text-gray-400 font-semibold">{doneTodayCount}/{totalTodayCount}</span>
+          </div>
+          <button
+            onClick={() => setTab('habits')}
+            className="flex items-center gap-1 bg-[#12141C] border border-[#272B36] rounded-lg px-2.5 py-1.5 text-[10px] font-semibold text-gray-300 hover:text-white transition cursor-pointer"
+          >
+            <span>Habits</span>
+            <ArrowUpRight className="w-3 h-3" />
+          </button>
+        </div>
+      </header>
+
+      {/* 1b. Desktop-only full header */}
+      <header className="hidden md:flex flex-row items-center justify-between pb-6 border-b border-[#1A1D24] gap-6">
         <div>
           <span className="font-mono text-xs text-[#12B886] uppercase tracking-widest font-semibold flex items-center">
             <Sparkles className="w-3.5 h-3.5 mr-1 text-[#FCC419] animate-spin-slow" />
             Productivity Identity System
           </span>
-          <h1 className="text-4xl md:text-5xl font-extrabold tracking-tighter text-white font-sans mt-1">
+          <h1 className="text-5xl font-extrabold tracking-tighter text-white font-sans mt-1">
             Habits
           </h1>
           <p className="text-sm text-gray-400 font-sans mt-1 text-left">
@@ -260,53 +307,34 @@ export default function Dashboard({
           </p>
         </div>
 
-        <div className="flex items-center space-x-6 w-full md:w-auto justify-between md:justify-end">
-          <div className="hidden md:flex bg-[#14161F]/95 border border-[#232734] rounded-2xl p-4 items-center space-x-4 max-w-xs shadow-md relative overflow-hidden group/header-gauge hover:border-[#12B886]/30 hover:shadow-[0_0_20px_rgba(18,184,134,0.12)] transition-all duration-350">
-            {/* Ambient subtle glow back layer */}
+        <div className="flex items-center space-x-6">
+          <div className="flex bg-[#14161F]/95 border border-[#232734] rounded-2xl p-4 items-center space-x-4 max-w-xs shadow-md relative overflow-hidden group/header-gauge hover:border-[#12B886]/30 hover:shadow-[0_0_20px_rgba(18,184,134,0.12)] transition-all duration-350">
             <div className="absolute inset-0 bg-gradient-to-tr from-[#12B886]/5 to-transparent opacity-0 group-hover/header-gauge:opacity-100 transition-opacity duration-350 pointer-events-none" />
-            
-            {/* SVG Ring */}
             <div className="relative w-14 h-14 flex items-center justify-center shrink-0">
               <svg className="absolute w-full h-full transform -rotate-90">
+                <circle cx="28" cy="28" r="23" className="stroke-gray-800" strokeWidth="3.5" fill="transparent" />
                 <circle
-                  cx="28"
-                  cy="28"
-                  r="23"
-                  className="stroke-gray-800"
-                  strokeWidth="3.5"
-                  fill="transparent"
-                />
-                <circle
-                  cx="28"
-                  cy="28"
-                  r="23"
+                  cx="28" cy="28" r="23"
                   className="stroke-[#12B886] transition-all duration-500"
-                  strokeWidth="3.5"
-                  fill="transparent"
+                  strokeWidth="3.5" fill="transparent"
                   strokeDasharray={2 * Math.PI * 23}
                   strokeDashoffset={2 * Math.PI * 23 * (1 - overallTodayProgress / 100)}
                   style={{ filter: 'drop-shadow(0 0 4px rgba(18, 184, 134, 0.5))' }}
                 />
               </svg>
-              <div className="text-xs font-mono font-bold text-white pr-0.5 relative z-10">
-                {overallTodayProgress}%
-              </div>
+              <div className="text-xs font-mono font-bold text-white pr-0.5 relative z-10">{overallTodayProgress}%</div>
             </div>
-
             <div className="text-left relative z-10">
-              <h4 className="text-sm font-bold font-sans text-white">
-                {doneTodayCount}/{totalTodayCount} done today
-              </h4>
+              <h4 className="text-sm font-bold font-sans text-white">{doneTodayCount}/{totalTodayCount} done today</h4>
               <p className="text-[11px] font-mono text-gray-400 mt-0.5 flex items-center">
                 <Zap className="w-3 h-3 text-[#FCC419] mr-0.5 fill-[#FCC419] animate-pulse" />
                 {earnedPointsToday}/{totalPotentialPoints} pts today
               </p>
             </div>
           </div>
-
           <button
             onClick={() => setTab('habits')}
-            className="hidden sm:flex items-center space-x-1 border border-[#272B36] bg-[#12141C] hover:bg-[#1E212E] hover:text-white px-4 py-2.5 rounded-xl text-xs font-semibold text-gray-300 cursor-pointer transition-all hover:shadow-[0_0_15px_rgba(255,255,255,0.05)] select-none"
+            className="flex items-center space-x-1 border border-[#272B36] bg-[#12141C] hover:bg-[#1E212E] hover:text-white px-4 py-2.5 rounded-xl text-xs font-semibold text-gray-300 cursor-pointer transition-all hover:shadow-[0_0_15px_rgba(255,255,255,0.05)] select-none"
           >
             <span>My Habits</span>
             <ArrowUpRight className="w-3.5 h-3.5" />
@@ -314,9 +342,9 @@ export default function Dashboard({
         </div>
       </header>
 
-      {/* Active category pills */}
+      {/* Active category pills — hidden on mobile to save vertical space */}
       {activeCategories.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2 md:gap-3">
+        <div className="hidden md:flex flex-wrap items-center gap-2 md:gap-3">
           {activeCategories.map((cat) => {
             const val = getCategoryStats(cat);
             const color = getCategoryColor(cat);
@@ -350,54 +378,54 @@ export default function Dashboard({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
         
         {/* Card 1: PROGRESS TODAY */}
-        <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-4 sm:p-5 flex flex-col justify-between h-36 sm:h-40 md:h-44 relative overflow-hidden group hover:border-[#12B886]/40 hover:shadow-[0_0_25px_rgba(18,184,134,0.12)] transition-all duration-300">
+        <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-2.5 flex flex-col justify-between h-20 sm:h-22 relative overflow-hidden group hover:border-[#12B886]/40 hover:shadow-[0_0_25px_rgba(18,184,134,0.12)] transition-all duration-300">
           <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-br from-[#12B886]/5 to-transparent rounded-full blur-2xl pointer-events-none" />
           <div className="relative z-10 text-left">
-            <div className="flex items-center text-[10px] font-mono text-gray-500 tracking-wider select-none">
+            <div className="flex items-center text-[9px] font-mono text-gray-500 tracking-wider select-none">
               PROGRESS TODAY
-              <span className="text-[10px] ml-1 text-gray-400 cursor-pointer hidden sm:inline">ⓘ</span>
+              <span className="text-[9px] ml-1 text-gray-400 cursor-pointer hidden sm:inline">ⓘ</span>
             </div>
-            <div className="mt-1 sm:mt-2 text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#12B886] font-sans tracking-tight">
+            <div className="mt-0.5 text-lg sm:text-xl font-extrabold text-[#12B886] font-sans tracking-tight">
               {overallTodayProgress}%
             </div>
           </div>
 
           <div className="relative z-10 text-left">
-            <div className="w-full h-1.5 bg-[#171924] rounded-full overflow-hidden mt-2">
+            <div className="w-full h-1 bg-[#171924] rounded-full overflow-hidden mt-1.5">
               <div
                 className="h-full bg-[#12B886] transition-all duration-500 rounded-full"
                 style={{ width: `${overallTodayProgress}%`, boxShadow: '0 0 6px #12B886dd' }}
               />
             </div>
-            <div className="flex items-center justify-between text-[11px] font-semibold text-gray-400 mt-2 select-none">
+            <div className="flex items-center justify-between text-[10px] font-semibold text-gray-400 mt-1 select-none">
               <span>{doneTodayCount}/{totalTodayCount} done</span>
             </div>
           </div>
         </div>
 
         {/* Card 2: POINTS TODAY */}
-        <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-4 sm:p-5 flex flex-col justify-between h-36 sm:h-40 md:h-44 relative overflow-hidden group hover:border-[#12B886]/40 hover:shadow-[0_0_25px_rgba(18,184,134,0.12)] transition-all duration-300">
+        <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-2.5 flex flex-col justify-between h-20 sm:h-22 relative overflow-hidden group hover:border-[#12B886]/40 hover:shadow-[0_0_25px_rgba(18,184,134,0.12)] transition-all duration-300">
           <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-br from-[#12B886]/5 to-transparent rounded-full blur-2xl pointer-events-none" />
           <div className="relative z-10 text-left">
-            <div className="flex items-center text-[10px] font-mono text-gray-500 tracking-wider select-none">
+            <div className="flex items-center text-[9px] font-mono text-gray-500 tracking-wider select-none">
               POINTS TODAY
-              <span className="text-[10px] ml-1 text-gray-400 cursor-pointer hidden sm:inline">ⓘ</span>
+              <span className="text-[9px] ml-1 text-gray-400 cursor-pointer hidden sm:inline">ⓘ</span>
             </div>
-            <div className="mt-1 sm:mt-2 text-xl sm:text-2xl md:text-3xl font-extrabold text-white font-sans tracking-tight truncate">
-              {earnedPointsToday} <span className="text-gray-600 font-light text-sm sm:text-lg">/</span> <span className="text-gray-400 font-medium text-lg sm:text-xl">{totalPotentialPoints}</span>
+            <div className="mt-0.5 text-base sm:text-lg font-extrabold text-white font-sans tracking-tight truncate">
+              {earnedPointsToday} <span className="text-gray-650 font-light text-xs">/</span> <span className="text-gray-400 font-medium text-xs sm:text-sm">{totalPotentialPoints}</span>
             </div>
           </div>
 
           <div className="relative z-10 text-left">
-            <div className="w-full h-1.5 bg-[#171924] rounded-full overflow-hidden mt-2">
+            <div className="w-full h-1 bg-[#171924] rounded-full overflow-hidden mt-1.5">
               <div
                 className="h-full bg-gradient-to-r from-[#12B886] to-[#A9E34B] transition-all duration-500 rounded-full"
                 style={{ width: `${totalPotentialPoints > 0 ? (earnedPointsToday / totalPotentialPoints) * 100 : 0}%`, boxShadow: '0 0 6px #12B886dd' }}
               />
             </div>
-            <div className="flex items-center justify-between text-[11px] font-semibold text-gray-400 mt-2 select-none">
+            <div className="flex items-center justify-between text-[10px] font-semibold text-gray-400 mt-1 select-none">
               <span className="hidden sm:inline">{totalPotentialPoints - earnedPointsToday} left</span>
-              <span className="border border-[#12B886]/40 bg-[#12B886]/10 text-[#12B886] px-1.5 py-0.5 rounded text-[9px] font-mono font-bold">
+              <span className="border border-[#12B886]/40 bg-[#12B886]/10 text-[#12B886] px-1 py-0.2 rounded text-[8px] font-mono font-bold">
                 Lv. {Math.floor(userPoints / 100) + 1}
               </span>
             </div>
@@ -405,31 +433,28 @@ export default function Dashboard({
         </div>
 
         {/* Card 3: MOMENTUM */}
-        <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-4 sm:p-5 flex flex-col justify-between h-36 sm:h-40 md:h-44 relative overflow-hidden group hover:border-red-500/30 hover:shadow-[0_0_25px_rgba(250,82,82,0.12)] transition-all duration-300">
+        <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-2.5 flex flex-col justify-between h-20 sm:h-22 relative overflow-hidden group hover:border-red-500/30 hover:shadow-[0_0_25px_rgba(250,82,82,0.12)] transition-all duration-300">
           <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-br from-[#FA5252]/5 to-transparent rounded-full blur-2xl pointer-events-none" />
           <div className="relative z-10 text-left">
-            <div className="flex items-center justify-between text-[10px] font-mono text-gray-500 tracking-wider select-none">
+            <div className="flex items-center justify-between text-[9px] font-mono text-gray-500 tracking-wider select-none">
               <span>MOMENTUM</span>
-              <span className="text-[10px] text-gray-400 hidden sm:inline">ⓘ</span>
+              <span className="text-[9px] text-gray-400 hidden sm:inline">ⓘ</span>
             </div>
-            <div className="mt-1 sm:mt-2 text-base sm:text-lg md:text-2xl font-extrabold text-[#FA5252] font-sans tracking-tight truncate filter drop-shadow-[0_0_6px_rgba(250,82,82,0.2)]">
+            <div className="mt-0.5 text-xs sm:text-sm font-extrabold text-[#FA5252] font-sans tracking-tight truncate filter drop-shadow-[0_0_6px_rgba(250,82,82,0.2)]">
               {momentumScore >= 90 ? 'Ultra Focus' : momentumScore >= 75 ? 'Flow State' : momentumScore >= 45 ? 'Ignition' : 'Inertia'}
             </div>
-            <p className="text-[10px] text-gray-400 font-sans mt-0.5 font-semibold truncate hidden sm:block">
-              {momentumScore >= 45 ? 'Momentum active.' : 'Decay detected.'}
-            </p>
           </div>
 
-          <div className="flex items-center justify-between select-none relative z-10 mt-2">
-            <span className="text-[11px] font-mono font-bold text-gray-300">
+          <div className="flex items-center justify-between select-none relative z-10 mt-1.5">
+            <span className="text-[10px] font-mono font-bold text-gray-300">
               {momentumScore}%
             </span>
-            <svg className="w-12 sm:w-20 h-6 overflow-visible shrink-0" viewBox="0 0 100 40">
+            <svg className="w-12 sm:w-16 h-4 overflow-visible shrink-0" viewBox="0 0 100 40">
               <path
                 d="M 0 32 Q 25 18, 50 25 T 85 14 T 100 4"
                 fill="none"
                 stroke={momentumScore >= 45 ? '#12B886' : '#FCC419'}
-                strokeWidth="3"
+                strokeWidth="4"
                 strokeLinecap="round"
                 style={{ filter: `drop-shadow(0 0 4px ${momentumScore >= 45 ? 'rgba(18,184,134,0.5)' : 'rgba(252,196,25,0.5)'})` }}
                 className="transition-all duration-300"
@@ -437,7 +462,7 @@ export default function Dashboard({
               <circle
                 cx="100"
                 cy="4"
-                r="4"
+                r="5"
                 fill={momentumScore >= 45 ? '#12B886' : '#FCC419'}
                 className="animate-pulse"
               />
@@ -446,33 +471,33 @@ export default function Dashboard({
         </div>
 
         {/* Card 4: 1% BETTER COMP_INDEX */}
-        <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-4 sm:p-5 flex flex-col justify-between h-36 sm:h-40 md:h-44 relative overflow-hidden group hover:border-[#FCC419]/40 hover:shadow-[0_0_25px_rgba(252,196,25,0.12)] transition-all duration-300">
+        <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-2.5 flex flex-col justify-between h-20 sm:h-22 relative overflow-hidden group hover:border-[#FCC419]/40 hover:shadow-[0_0_25px_rgba(252,196,25,0.12)] transition-all duration-300">
           <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-br from-[#FCC419]/5 to-transparent rounded-full blur-2xl pointer-events-none" />
           <div className="relative z-10 text-left">
-            <div className="flex items-center justify-between text-[10px] font-mono text-gray-500 tracking-wider select-none">
+            <div className="flex items-center justify-between text-[9px] font-mono text-gray-500 tracking-wider select-none">
               <span>COMP INDEX</span>
-              <span className="text-[10px] text-gray-400 hidden sm:inline">ⓘ</span>
+              <span className="text-[9px] text-gray-400 hidden sm:inline">ⓘ</span>
             </div>
-            <div className="mt-1 sm:mt-2 text-xl sm:text-2xl md:text-3xl font-extrabold text-[#FCC419] font-sans tracking-tight filter drop-shadow-[0_0_6px_rgba(252,196,25,0.2)]">
+            <div className="mt-0.5 text-base sm:text-lg font-extrabold text-[#FCC419] font-sans tracking-tight filter drop-shadow-[0_0_6px_rgba(252,196,25,0.2)]">
               +{activeGrowthValue.toFixed(1)}%
             </div>
           </div>
 
-          <div className="flex items-end justify-between select-none relative z-10 mt-2 text-left">
+          <div className="flex items-end justify-between select-none relative z-10 mt-1.5 text-left">
             <div className="flex flex-col w-full">
-              <div className="w-full h-1 bg-[#171924] rounded-full overflow-hidden mb-1.5">
+              <div className="w-full h-1 bg-[#171924] rounded-full overflow-hidden mb-1">
                 <div
                   className="h-full bg-[#FCC419] transition-all duration-500 rounded-full"
                   style={{ width: `${Math.min(100, (activeGrowthValue / 30) * 100)}%`, boxShadow: '0 0 6px #FCC419dd' }}
                 />
               </div>
-              <span className="text-[10px] font-bold text-gray-400 truncate">
+              <span className="text-[9px] font-bold text-gray-400 truncate">
                 Streak: <span className="text-[#FCC419] font-mono">{betterStreak}d</span>
               </span>
             </div>
             <button 
               onClick={() => setTab('1%better')}
-              className="text-[9px] font-mono font-bold bg-[#12141C] border border-[#232734] text-gray-300 px-2 py-1 rounded ml-2 cursor-pointer hover:bg-gray-800 hover:text-[#FCC419] hover:border-[#FCC419]/40 transition duration-350 shadow-sm hidden xs:block"
+              className="text-[8px] font-mono font-bold bg-[#12141C] border border-[#232734] text-gray-300 px-1.5 py-0.5 rounded ml-1.5 cursor-pointer hover:bg-gray-800 hover:text-[#FCC419] hover:border-[#FCC419]/40 transition duration-350 shadow-sm hidden xs:block"
             >
               MAP
             </button>
@@ -501,16 +526,21 @@ export default function Dashboard({
         </div>
 
         {(() => {
-          const allCount = habits.length;
-          const morningCount = habits.filter(h => getHabitTimeframe(h, routines) === 'Morning').length;
-          const eveningCount = habits.filter(h => getHabitTimeframe(h, routines) === 'Evening').length;
-          const nightCount = habits.filter(h => getHabitTimeframe(h, routines) === 'Night').length;
-
-          const displayedHabits = habits.filter(item => {
+          const filteredHabitsForCounts = habits.filter(item => {
             if (focusRoutineId) {
               const activeRt = routines.find(r => r.id === focusRoutineId);
-              if (activeRt && !activeRt.habitIds.includes(item.id)) return false;
+              return activeRt ? activeRt.habitIds.includes(item.id) : false;
+            } else {
+              return !item.routineId;
             }
+          });
+
+          const allCount = filteredHabitsForCounts.length;
+          const morningCount = filteredHabitsForCounts.filter(h => getHabitTimeframe(h, routines) === 'Morning').length;
+          const eveningCount = filteredHabitsForCounts.filter(h => getHabitTimeframe(h, routines) === 'Evening').length;
+          const nightCount = filteredHabitsForCounts.filter(h => getHabitTimeframe(h, routines) === 'Night').length;
+
+          const displayedHabits = filteredHabitsForCounts.filter(item => {
             if (timeframeFilter === 'All') return true;
             return getHabitTimeframe(item, routines) === timeframeFilter;
           });
@@ -782,7 +812,7 @@ export default function Dashboard({
                                     <span className="text-gray-700">&bull;</span>
                                     <span className="flex items-center text-[#FCC419] font-semibold">
                                       <Zap className="w-3.5 h-3.5 mr-0.5 fill-[#FCC419]" />
-                                      {item.points} pts
+                                      {item.routineId ? 0 : item.points} pts
                                     </span>
                                   </div>
                                 </div>
