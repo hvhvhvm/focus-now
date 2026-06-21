@@ -34,7 +34,7 @@ export default function BottomNav({
         className="border-t border-[#1E222A]/80 bg-[#0A0B0E]/95"
         style={{ backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}
       >
-        <div className="flex items-stretch h-[60px]">
+        <div className="flex items-stretch h-[64px]">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentTab === item.id;
@@ -56,11 +56,11 @@ export default function BottomNav({
 
                 <Icon
                   className={`transition-all duration-200 ${
-                    isActive ? 'w-5 h-5 drop-shadow-[0_0_6px_rgba(18,184,134,0.8)]' : 'w-5 h-5'
+                    isActive ? 'w-[22px] h-[22px] drop-shadow-[0_0_6px_rgba(18,184,134,0.8)]' : 'w-[22px] h-[22px]'
                   }`}
                 />
                 <span
-                  className={`text-[10px] font-semibold font-sans transition-all leading-none ${
+                  className={`text-[11px] font-semibold font-sans transition-all leading-none ${
                     isActive ? 'opacity-100' : 'opacity-60'
                   }`}
                 >

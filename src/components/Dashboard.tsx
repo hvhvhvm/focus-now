@@ -254,21 +254,21 @@ export default function Dashboard({
   }
 
   return (
-    <div className="space-y-4 md:space-y-8 max-w-5xl mx-auto">
+    <div className="space-y-5 md:space-y-8 max-w-5xl mx-auto">
       {/* 1a. Mobile-only compact header */}
-      <header className="md:hidden flex items-center justify-between py-1 border-b border-[#1A1D24]">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-3.5 h-3.5 text-[#FCC419] animate-spin-slow shrink-0" />
-          <h1 className="text-base font-extrabold tracking-tight text-white font-sans">
+      <header className="md:hidden flex items-center justify-between py-2 border-b border-[#1A1D24]">
+        <div className="flex items-center gap-2.5">
+          <Sparkles className="w-4.5 h-4.5 text-[#FCC419] animate-spin-slow shrink-0" />
+          <h1 className="text-lg font-extrabold tracking-tight text-white font-sans">
             Habits
           </h1>
-          <span className="text-[10px] font-mono text-gray-500 hidden xs:inline">
+          <span className="text-xs font-mono text-gray-500">
             {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
           </span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 bg-[#12B886]/10 border border-[#12B886]/25 rounded-full px-2.5 py-1">
-            <div className="relative w-4 h-4 shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2 bg-[#12B886]/10 border border-[#12B886]/25 rounded-full px-3 py-1.5">
+            <div className="relative w-5 h-5 shrink-0">
               <svg className="absolute w-full h-full -rotate-90" viewBox="0 0 20 20">
                 <circle cx="10" cy="10" r="8" className="stroke-gray-800" strokeWidth="2.5" fill="transparent" />
                 <circle
@@ -280,15 +280,15 @@ export default function Dashboard({
                 />
               </svg>
             </div>
-            <span className="text-xs font-mono font-bold text-[#12B886]">{overallTodayProgress}%</span>
-            <span className="text-[10px] text-gray-400 font-semibold">{doneTodayCount}/{totalTodayCount}</span>
+            <span className="text-sm font-mono font-bold text-[#12B886]">{overallTodayProgress}%</span>
+            <span className="text-xs text-gray-400 font-semibold">{doneTodayCount}/{totalTodayCount}</span>
           </div>
           <button
             onClick={() => setTab('habits')}
-            className="flex items-center gap-1 bg-[#12141C] border border-[#272B36] rounded-lg px-2.5 py-1.5 text-[10px] font-semibold text-gray-300 hover:text-white transition cursor-pointer"
+            className="flex items-center gap-1.5 bg-[#12141C] border border-[#272B36] rounded-lg px-3 py-2 text-xs font-semibold text-gray-300 hover:text-white transition cursor-pointer"
           >
             <span>Habits</span>
-            <ArrowUpRight className="w-3 h-3" />
+            <ArrowUpRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </header>
@@ -376,57 +376,57 @@ export default function Dashboard({
       )}
 
       {/* 2. Primary Metrics: Progress, Points, Momentum, and Compounding Index */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 md:gap-6">
         
         {/* Card 1: PROGRESS TODAY */}
-        <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-2.5 flex flex-col justify-between h-20 sm:h-22 relative overflow-hidden group hover:border-[#12B886]/40 hover:shadow-[0_0_25px_rgba(18,184,134,0.12)] transition-all duration-300">
+        <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-3.5 md:p-2.5 flex flex-col justify-between h-28 sm:h-22 relative overflow-hidden group hover:border-[#12B886]/40 hover:shadow-[0_0_25px_rgba(18,184,134,0.12)] transition-all duration-300">
           <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-br from-[#12B886]/5 to-transparent rounded-full blur-2xl pointer-events-none" />
           <div className="relative z-10 text-left">
-            <div className="flex items-center text-[9px] font-mono text-gray-500 tracking-wider select-none">
+            <div className="flex items-center text-[11px] md:text-[9px] font-mono text-gray-500 tracking-wider select-none">
               PROGRESS TODAY
               <span className="text-[9px] ml-1 text-gray-400 cursor-pointer hidden sm:inline">ⓘ</span>
             </div>
-            <div className="mt-0.5 text-lg sm:text-xl font-extrabold text-[#12B886] font-sans tracking-tight">
+            <div className="mt-1 text-2xl sm:text-xl font-extrabold text-[#12B886] font-sans tracking-tight">
               {overallTodayProgress}%
             </div>
           </div>
 
           <div className="relative z-10 text-left">
-            <div className="w-full h-1 bg-[#171924] rounded-full overflow-hidden mt-1.5">
+            <div className="w-full h-1.5 md:h-1 bg-[#171924] rounded-full overflow-hidden mt-2">
               <div
                 className="h-full bg-[#12B886] transition-all duration-500 rounded-full"
                 style={{ width: `${overallTodayProgress}%`, boxShadow: '0 0 6px #12B886dd' }}
               />
             </div>
-            <div className="flex items-center justify-between text-[10px] font-semibold text-gray-400 mt-1 select-none">
+            <div className="flex items-center justify-between text-xs md:text-[10px] font-semibold text-gray-400 mt-1.5 select-none">
               <span>{doneTodayCount}/{totalTodayCount} done</span>
             </div>
           </div>
         </div>
 
         {/* Card 2: POINTS TODAY */}
-        <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-2.5 flex flex-col justify-between h-20 sm:h-22 relative overflow-hidden group hover:border-[#12B886]/40 hover:shadow-[0_0_25px_rgba(18,184,134,0.12)] transition-all duration-300">
+        <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-3.5 md:p-2.5 flex flex-col justify-between h-28 sm:h-22 relative overflow-hidden group hover:border-[#12B886]/40 hover:shadow-[0_0_25px_rgba(18,184,134,0.12)] transition-all duration-300">
           <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-br from-[#12B886]/5 to-transparent rounded-full blur-2xl pointer-events-none" />
           <div className="relative z-10 text-left">
-            <div className="flex items-center text-[9px] font-mono text-gray-500 tracking-wider select-none">
+            <div className="flex items-center text-[11px] md:text-[9px] font-mono text-gray-500 tracking-wider select-none">
               POINTS TODAY
               <span className="text-[9px] ml-1 text-gray-400 cursor-pointer hidden sm:inline">ⓘ</span>
             </div>
-            <div className="mt-0.5 text-base sm:text-lg font-extrabold text-white font-sans tracking-tight truncate">
-              {earnedPointsToday} <span className="text-gray-650 font-light text-xs">/</span> <span className="text-gray-400 font-medium text-xs sm:text-sm">{totalPotentialPoints}</span>
+            <div className="mt-1 text-xl sm:text-lg font-extrabold text-white font-sans tracking-tight truncate">
+              {earnedPointsToday} <span className="text-gray-650 font-light text-sm">/</span> <span className="text-gray-400 font-medium text-sm sm:text-sm">{totalPotentialPoints}</span>
             </div>
           </div>
 
           <div className="relative z-10 text-left">
-            <div className="w-full h-1 bg-[#171924] rounded-full overflow-hidden mt-1.5">
+            <div className="w-full h-1.5 md:h-1 bg-[#171924] rounded-full overflow-hidden mt-2">
               <div
                 className="h-full bg-gradient-to-r from-[#12B886] to-[#A9E34B] transition-all duration-500 rounded-full"
                 style={{ width: `${totalPotentialPoints > 0 ? (earnedPointsToday / totalPotentialPoints) * 100 : 0}%`, boxShadow: '0 0 6px #12B886dd' }}
               />
             </div>
-            <div className="flex items-center justify-between text-[10px] font-semibold text-gray-400 mt-1 select-none">
-              <span className="hidden sm:inline">{totalPotentialPoints - earnedPointsToday} left</span>
-              <span className="border border-[#12B886]/40 bg-[#12B886]/10 text-[#12B886] px-1 py-0.2 rounded text-[8px] font-mono font-bold">
+            <div className="flex items-center justify-between text-xs md:text-[10px] font-semibold text-gray-400 mt-1.5 select-none">
+              <span>{totalPotentialPoints - earnedPointsToday} left</span>
+              <span className="border border-[#12B886]/40 bg-[#12B886]/10 text-[#12B886] px-1.5 py-0.5 rounded text-[10px] md:text-[8px] font-mono font-bold">
                 Lv. {Math.floor(userPoints / 100) + 1}
               </span>
             </div>
@@ -434,23 +434,23 @@ export default function Dashboard({
         </div>
 
         {/* Card 3: MOMENTUM */}
-        <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-2.5 flex flex-col justify-between h-20 sm:h-22 relative overflow-hidden group hover:border-red-500/30 hover:shadow-[0_0_25px_rgba(250,82,82,0.12)] transition-all duration-300">
+        <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-3.5 md:p-2.5 flex flex-col justify-between h-28 sm:h-22 relative overflow-hidden group hover:border-red-500/30 hover:shadow-[0_0_25px_rgba(250,82,82,0.12)] transition-all duration-300">
           <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-br from-[#FA5252]/5 to-transparent rounded-full blur-2xl pointer-events-none" />
           <div className="relative z-10 text-left">
-            <div className="flex items-center justify-between text-[9px] font-mono text-gray-500 tracking-wider select-none">
+            <div className="flex items-center justify-between text-[11px] md:text-[9px] font-mono text-gray-500 tracking-wider select-none">
               <span>MOMENTUM</span>
               <span className="text-[9px] text-gray-400 hidden sm:inline">ⓘ</span>
             </div>
-            <div className="mt-0.5 text-xs sm:text-sm font-extrabold text-[#FA5252] font-sans tracking-tight truncate filter drop-shadow-[0_0_6px_rgba(250,82,82,0.2)]">
+            <div className="mt-1 text-sm sm:text-sm font-extrabold text-[#FA5252] font-sans tracking-tight truncate filter drop-shadow-[0_0_6px_rgba(250,82,82,0.2)]">
               {momentumScore >= 90 ? 'Ultra Focus' : momentumScore >= 75 ? 'Flow State' : momentumScore >= 45 ? 'Ignition' : 'Inertia'}
             </div>
           </div>
 
-          <div className="flex items-center justify-between select-none relative z-10 mt-1.5">
-            <span className="text-[10px] font-mono font-bold text-gray-300">
+          <div className="flex items-center justify-between select-none relative z-10 mt-2">
+            <span className="text-sm md:text-[10px] font-mono font-bold text-gray-300">
               {momentumScore}%
             </span>
-            <svg className="w-12 sm:w-16 h-4 overflow-visible shrink-0" viewBox="0 0 100 40">
+            <svg className="w-16 sm:w-16 h-5 overflow-visible shrink-0" viewBox="0 0 100 40">
               <path
                 d="M 0 32 Q 25 18, 50 25 T 85 14 T 100 4"
                 fill="none"
@@ -472,33 +472,33 @@ export default function Dashboard({
         </div>
 
         {/* Card 4: 1% BETTER COMP_INDEX */}
-        <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-2.5 flex flex-col justify-between h-20 sm:h-22 relative overflow-hidden group hover:border-[#FCC419]/40 hover:shadow-[0_0_25px_rgba(252,196,25,0.12)] transition-all duration-300">
+        <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-3.5 md:p-2.5 flex flex-col justify-between h-28 sm:h-22 relative overflow-hidden group hover:border-[#FCC419]/40 hover:shadow-[0_0_25px_rgba(252,196,25,0.12)] transition-all duration-300">
           <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-br from-[#FCC419]/5 to-transparent rounded-full blur-2xl pointer-events-none" />
           <div className="relative z-10 text-left">
-            <div className="flex items-center justify-between text-[9px] font-mono text-gray-500 tracking-wider select-none">
+            <div className="flex items-center justify-between text-[11px] md:text-[9px] font-mono text-gray-500 tracking-wider select-none">
               <span>COMP INDEX</span>
               <span className="text-[9px] text-gray-400 hidden sm:inline">ⓘ</span>
             </div>
-            <div className="mt-0.5 text-base sm:text-lg font-extrabold text-[#FCC419] font-sans tracking-tight filter drop-shadow-[0_0_6px_rgba(252,196,25,0.2)]">
+            <div className="mt-1 text-xl sm:text-lg font-extrabold text-[#FCC419] font-sans tracking-tight filter drop-shadow-[0_0_6px_rgba(252,196,25,0.2)]">
               +{activeGrowthValue.toFixed(1)}%
             </div>
           </div>
 
-          <div className="flex items-end justify-between select-none relative z-10 mt-1.5 text-left">
+          <div className="flex items-end justify-between select-none relative z-10 mt-2 text-left">
             <div className="flex flex-col w-full">
-              <div className="w-full h-1 bg-[#171924] rounded-full overflow-hidden mb-1">
+              <div className="w-full h-1.5 md:h-1 bg-[#171924] rounded-full overflow-hidden mb-1">
                 <div
                   className="h-full bg-[#FCC419] transition-all duration-500 rounded-full"
                   style={{ width: `${Math.min(100, (activeGrowthValue / 30) * 100)}%`, boxShadow: '0 0 6px #FCC419dd' }}
                 />
               </div>
-              <span className="text-[9px] font-bold text-gray-400 truncate">
+              <span className="text-[11px] md:text-[9px] font-bold text-gray-400 truncate">
                 Streak: <span className="text-[#FCC419] font-mono">{betterStreak}d</span>
               </span>
             </div>
             <button 
               onClick={() => setTab('1%better')}
-              className="text-[8px] font-mono font-bold bg-[#12141C] border border-[#232734] text-gray-300 px-1.5 py-0.5 rounded ml-1.5 cursor-pointer hover:bg-gray-800 hover:text-[#FCC419] hover:border-[#FCC419]/40 transition duration-350 shadow-sm hidden xs:block"
+              className="text-[10px] md:text-[8px] font-mono font-bold bg-[#12141C] border border-[#232734] text-gray-300 px-2 py-1 md:px-1.5 md:py-0.5 rounded ml-1.5 cursor-pointer hover:bg-gray-800 hover:text-[#FCC419] hover:border-[#FCC419]/40 transition duration-350 shadow-sm"
             >
               MAP
             </button>
@@ -508,16 +508,16 @@ export default function Dashboard({
       </div>
 
       {/* 3. Quick Habit Logger with points rewarding system */}
-      <div id="quick-habit-logger-section" className="bg-[#14161F]/90 border border-[#232734]/80 p-3 md:p-6 rounded-2xl shadow-lg relative overflow-hidden group/logger duration-300 transition-all hover:border-[#12B886]/20 hover:shadow-[0_0_35px_rgba(18,184,134,0.03)]">
+      <div id="quick-habit-logger-section" className="bg-[#14161F]/90 border border-[#232734]/80 p-4 md:p-6 rounded-2xl shadow-lg relative overflow-hidden group/logger duration-300 transition-all hover:border-[#12B886]/20 hover:shadow-[0_0_35px_rgba(18,184,134,0.03)]">
         {/* Dynamic backdrop glows */}
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-gradient-to-r from-purple-500/5 to-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
         {/* Header: single compact row */}
-        <div className="flex items-center justify-between mb-3 relative z-10">
-          <h3 className="text-sm font-bold text-white font-sans flex items-center">
-            <CheckCircle2 className="w-4 h-4 text-[#12B886] mr-1.5 animate-pulse" />
+        <div className="flex items-center justify-between mb-4 md:mb-3 relative z-10">
+          <h3 className="text-base md:text-sm font-bold text-white font-sans flex items-center">
+            <CheckCircle2 className="w-5 h-5 md:w-4 md:h-4 text-[#12B886] mr-2 md:mr-1.5 animate-pulse" />
             Quick Habit Logger
           </h3>
-          <span className="text-[10px] text-gray-400 font-mono tracking-widest font-semibold bg-[#1D212F] px-2 py-0.5 rounded border border-[#2C3246]/50">
+          <span className="text-xs md:text-[10px] text-gray-400 font-mono tracking-widest font-semibold bg-[#1D212F] px-2.5 py-1 md:px-2 md:py-0.5 rounded border border-[#2C3246]/50">
             ⚡ 1-TAP
           </span>
         </div>
@@ -560,34 +560,34 @@ export default function Dashboard({
             return (
               <div
                 style={{ '--hover-glow': `${config.color}15`, '--card-border': `${config.color}35` } as React.CSSProperties}
-                className="relative bg-[#12141C]/90 hover:bg-[#151722] border border-[#232734]/50 hover:border-[var(--card-border)] rounded-[16px] transition-all duration-300 flex items-center pl-6 pr-3 py-2.5 gap-2.5 overflow-hidden group shadow-sm hover:shadow-[0_0_20px_var(--hover-glow)]"
+                className="relative bg-[#12141C]/90 hover:bg-[#151722] border border-[#232734]/50 hover:border-[var(--card-border)] rounded-[16px] transition-all duration-300 flex items-center pl-6 pr-3.5 py-3.5 md:py-2.5 gap-3 md:gap-2.5 overflow-hidden group shadow-sm hover:shadow-[0_0_20px_var(--hover-glow)]"
               >
                 <div className="absolute inset-0 pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity duration-300"
                   style={{ background: `radial-gradient(ellipse 180px 80px at 0% 50%, ${config.color}12, transparent)` }} />
                 <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-[16px]" style={{ backgroundColor: config.color }} />
                 {/* Icon */}
-                <div className="h-8 w-8 rounded-full flex items-center justify-center shrink-0 border relative z-10 group-hover:scale-105 transition-transform duration-300"
+                <div className="h-10 w-10 md:h-8 md:w-8 rounded-full flex items-center justify-center shrink-0 border relative z-10 group-hover:scale-105 transition-transform duration-300"
                   style={{ backgroundColor: `${config.color}15`, borderColor: `${config.color}25`, color: config.color }}>
-                  <IconComp className="w-3.5 h-3.5" />
+                  <IconComp className="w-4.5 h-4.5 md:w-3.5 md:h-3.5" />
                 </div>
                 {/* Name + meta */}
-                <div className="flex flex-col min-w-0 shrink-0 w-[85px] xs:w-[105px] relative z-10 text-left">
-                  <h4 className="text-[13px] font-bold text-white font-sans tracking-tight truncate">{item.name}</h4>
-                  <div className="flex items-center gap-1 text-[9px] text-gray-500 mt-0.5">
+                <div className="flex flex-col min-w-0 shrink-0 w-[95px] xs:w-[115px] md:w-[105px] relative z-10 text-left">
+                  <h4 className="text-[15px] md:text-[13px] font-bold text-white font-sans tracking-tight truncate">{item.name}</h4>
+                  <div className="flex items-center gap-1.5 md:gap-1 text-[11px] md:text-[9px] text-gray-500 mt-0.5">
                     <span className="font-semibold truncate" style={{ color: config.color }}>{item.category}</span>
                     <span className="text-gray-700">·</span>
                     <span className="flex items-center text-[#FCC419] font-semibold shrink-0">
-                      <Zap className="w-2 h-2 mr-0.5 fill-[#FCC419]" />{item.routineId ? 0 : item.points}pts
+                      <Zap className="w-2.5 h-2.5 md:w-2 md:h-2 mr-0.5 fill-[#FCC419]" />{item.routineId ? 0 : item.points}pts
                     </span>
                   </div>
                 </div>
                 {/* Progress bar */}
                 <div className="flex-1 min-w-0 relative z-10">
-                  <div className="flex justify-between items-center text-[9px] font-bold mb-1">
+                  <div className="flex justify-between items-center text-[11px] md:text-[9px] font-bold mb-1">
                     <span style={{ color: config.color }}>{progressVal}/{item.target} <span className="text-gray-600 font-normal">{item.unit}</span></span>
                     <span className="text-gray-500 font-mono">{percentage}%</span>
                   </div>
-                  <div className="w-full h-1.5 bg-[#171924] rounded-full overflow-hidden border border-gray-800/40">
+                  <div className="w-full h-2 md:h-1.5 bg-[#171924] rounded-full overflow-hidden border border-gray-800/40">
                     <div className="h-full transition-all duration-500 rounded-full"
                       style={{ width: `${percentage}%`, backgroundColor: config.color, boxShadow: `0 0 6px ${config.color}` }} />
                   </div>
@@ -595,17 +595,17 @@ export default function Dashboard({
                 {/* Circle complete */}
                 <div className="shrink-0 relative z-10">
                   {isCompleted ? (
-                    <div className="h-8 w-8 rounded-full flex items-center justify-center bg-[#12B886] animate-pulse text-black"
+                    <div className="h-10 w-10 md:h-8 md:w-8 rounded-full flex items-center justify-center bg-[#12B886] animate-pulse text-black"
                       style={{ filter: 'drop-shadow(0 0 5px rgba(18,184,134,0.6))' }}>
-                      <Check className="w-3.5 h-3.5 stroke-[3px]" />
+                      <Check className="w-4.5 h-4.5 md:w-3.5 md:h-3.5 stroke-[3px]" />
                     </div>
                   ) : (
                     <button onClick={() => handleQuickLog(item.id, remaining)}
-                      className="h-8 w-8 rounded-full border-2 flex items-center justify-center transition-all duration-300 cursor-pointer group/circle active:scale-90"
+                      className="h-10 w-10 md:h-8 md:w-8 rounded-full border-2 flex items-center justify-center transition-all duration-300 cursor-pointer group/circle active:scale-90"
                       style={{ borderColor: '#202434', backgroundColor: 'transparent' }}
                       onMouseEnter={e => { e.currentTarget.style.borderColor = config.color; e.currentTarget.style.backgroundColor = `${config.color}15`; e.currentTarget.style.boxShadow = `0 0 8px ${config.color}35`; }}
                       onMouseLeave={e => { e.currentTarget.style.borderColor = '#202434'; e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.boxShadow = 'none'; }}>
-                      <Check className="w-3.5 h-3.5 stroke-[3px] opacity-0 group-hover/circle:opacity-100 transition-opacity duration-200" style={{ color: config.color }} />
+                      <Check className="w-4.5 h-4.5 md:w-3.5 md:h-3.5 stroke-[3px] opacity-0 group-hover/circle:opacity-100 transition-opacity duration-200" style={{ color: config.color }} />
                     </button>
                   )}
                 </div>
@@ -622,7 +622,7 @@ export default function Dashboard({
           return (
             <div className="space-y-3">
               {/* ── Filter Tabs ── */}
-              <div className="flex items-center gap-1.5 border-b border-gray-800/60 pb-3 overflow-x-auto scrollbar-none">
+              <div className="flex items-center gap-2 md:gap-1.5 border-b border-gray-800/60 pb-3.5 md:pb-3 overflow-x-auto scrollbar-none">
                 {[
                   { value: 'All', label: 'All', count: allCount, icon: '', activeColor: 'bg-[#12B886]/10 text-[#12B886] border-[#12B886]/20' },
                   { value: 'Morning', label: 'Morning', count: morningCount, icon: '☀️', activeColor: 'bg-[#FCC419]/10 text-[#FCC419] border-[#FCC419]/30' },
@@ -632,12 +632,12 @@ export default function Dashboard({
                   const isActive = timeframeFilter === tab.value;
                   return (
                     <button key={tab.value} onClick={() => setTimeframeFilter(tab.value as any)}
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold cursor-pointer transition select-none shrink-0 ${
+                      className={`flex items-center gap-1.5 md:gap-1 px-3.5 py-2 md:px-2.5 md:py-1 rounded-full text-[13px] md:text-[11px] font-semibold cursor-pointer transition select-none shrink-0 ${
                         isActive ? 'border ' + tab.activeColor : 'bg-[#12141C] border border-[#232734] text-gray-400 hover:text-white hover:bg-[#1E212E]'
                       }`}>
-                      {tab.icon && <span className="text-[11px]">{tab.icon}</span>}
+                      {tab.icon && <span className="text-[13px] md:text-[11px]">{tab.icon}</span>}
                       <span>{tab.label}</span>
-                      <span className="text-[9px] font-mono font-extrabold bg-[#1A1D28] text-gray-500 border border-gray-800 px-1 rounded">{tab.count}</span>
+                      <span className="text-[11px] md:text-[9px] font-mono font-extrabold bg-[#1A1D28] text-gray-500 border border-gray-800 px-1.5 md:px-1 rounded">{tab.count}</span>
                     </button>
                   );
                 })}
@@ -651,7 +651,7 @@ export default function Dashboard({
                   <p className="text-xs text-gray-500 mt-1">No habits for the {timeframeFilter === 'All' ? 'day' : `${timeframeFilter.toLowerCase()} block`}.</p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-3.5 md:space-y-3">
                   {/* Routine sections */}
                   {routines.map(rt => {
                     const rtHabits = habits.filter(h => rt.habitIds.includes(h.id) && habitMatchesTimeframe(h));
@@ -672,40 +672,40 @@ export default function Dashboard({
                             next.has(rt.id) ? next.delete(rt.id) : next.add(rt.id);
                             return next;
                           })}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-[#845EF7]/5 transition-colors duration-200 cursor-pointer select-none"
+                          className="w-full flex items-center gap-3 md:gap-2.5 px-3.5 md:px-3 py-3 md:py-2 hover:bg-[#845EF7]/5 transition-colors duration-200 cursor-pointer select-none"
                         >
                           {/* Purple left accent */}
-                          <div className="w-1 h-6 rounded-full bg-[#845EF7] shrink-0" />
+                          <div className="w-1 h-7 md:h-6 rounded-full bg-[#845EF7] shrink-0" />
                           {/* Routine name + timeblock */}
                           <div className="flex-1 min-w-0 text-left">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-[11px] font-bold text-white truncate">🔄 {rt.name}</span>
+                            <div className="flex items-center gap-2 md:gap-1.5">
+                              <span className="text-[14px] md:text-[11px] font-bold text-white truncate">🔄 {rt.name}</span>
                               {rt.timeBlock && (
-                                <span className="text-[8px] font-mono text-purple-400 bg-purple-500/10 border border-purple-500/20 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0">
+                                <span className="text-[10px] md:text-[8px] font-mono text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 md:px-1.5 rounded uppercase tracking-wider shrink-0">
                                   {rt.timeBlock}
                                 </span>
                               )}
                               {allDone && (
-                                <span className="text-[8px] font-mono text-[#12B886] bg-[#12B886]/10 border border-[#12B886]/20 px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0 animate-pulse">
+                                <span className="text-[10px] md:text-[8px] font-mono text-[#12B886] bg-[#12B886]/10 border border-[#12B886]/20 px-2 py-0.5 md:px-1.5 rounded uppercase tracking-wider shrink-0 animate-pulse">
                                   ✓ Done
                                 </span>
                               )}
                             </div>
                             {/* Mini progress bar */}
-                            <div className="flex items-center gap-1.5 mt-1">
-                              <div className="flex-1 h-1 bg-gray-800 rounded-full overflow-hidden">
+                            <div className="flex items-center gap-2 md:gap-1.5 mt-1.5 md:mt-1">
+                              <div className="flex-1 h-1.5 md:h-1 bg-gray-800 rounded-full overflow-hidden">
                                 <div className="h-full bg-[#845EF7] rounded-full transition-all duration-500"
                                   style={{ width: `${rtProgress}%`, boxShadow: '0 0 4px #845EF7' }} />
                               </div>
-                              <span className="text-[9px] font-mono text-purple-400 shrink-0">{doneCount}/{totalCount}</span>
+                              <span className="text-[11px] md:text-[9px] font-mono text-purple-400 shrink-0">{doneCount}/{totalCount}</span>
                             </div>
                           </div>
                           {/* XP badge + chevron */}
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="text-[9px] font-mono font-bold text-[#FCC419] bg-[#FCC419]/10 border border-[#FCC419]/20 px-1.5 py-0.5 rounded">
+                          <div className="flex items-center gap-2 md:gap-1.5 shrink-0">
+                            <span className="text-[11px] md:text-[9px] font-mono font-bold text-[#FCC419] bg-[#FCC419]/10 border border-[#FCC419]/20 px-2 py-1 md:px-1.5 md:py-0.5 rounded">
                               +{rt.points}XP
                             </span>
-                            <svg className={`w-3.5 h-3.5 text-gray-500 transition-transform duration-200 ${isCollapsed ? '' : 'rotate-180'}`}
+                            <svg className={`w-4.5 h-4.5 md:w-3.5 md:h-3.5 text-gray-500 transition-transform duration-200 ${isCollapsed ? '' : 'rotate-180'}`}
                               viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                               <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
@@ -713,7 +713,7 @@ export default function Dashboard({
                         </button>
                         {/* Habit cards inside routine */}
                         {!isCollapsed && (
-                          <div className="flex flex-col gap-1.5 px-2 pb-2">
+                          <div className="flex flex-col gap-2 md:gap-1.5 px-2.5 md:px-2 pb-2.5 md:pb-2">
                             {rtHabits.map(item => <HabitCard key={item.id} item={item} />)}
                           </div>
                         )}
@@ -723,9 +723,9 @@ export default function Dashboard({
 
                   {/* Standalone habits (no routine) */}
                   {standaloneHabits.length > 0 && (
-                    <div className="space-y-1.5">
+                    <div className="space-y-2 md:space-y-1.5">
                       {routines.length > 0 && (
-                        <div className="text-[9px] font-mono text-gray-600 uppercase tracking-widest font-bold px-1 pt-1">
+                        <div className="text-[11px] md:text-[9px] font-mono text-gray-600 uppercase tracking-widest font-bold px-1 pt-1.5 md:pt-1">
                           Individual Habits
                         </div>
                       )}
