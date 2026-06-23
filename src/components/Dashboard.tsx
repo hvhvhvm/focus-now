@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { Zap, AlertTriangle, ArrowUpRight, TrendingUp, Dumbbell, BookOpen, Brain, Sparkles, CheckCircle2, Navigation, Clock, Check } from 'lucide-react';
+import { Zap, AlertTriangle, ArrowUpRight, TrendingUp, Dumbbell, BookOpen, Brain, Sparkles, CheckCircle2, Navigation, Clock, Check, ChevronRight, X } from 'lucide-react';
 import { Habit, Category, Routine } from '../types';
 import { calculateMomentum, dateToday } from '../data';
 import CategoryDetailView from './CategoryDetailView';
+
+type LogHabitHandler = (id: string, value: number) => void | Promise<void>;
 
 const getCategoryColor = (category: Category): string => {
   switch (category) {
@@ -66,11 +68,232 @@ const getHabitTimeframe = (habit: Habit, routines: Routine[]): 'Morning' | 'Even
   return 'Night';
 };
 
+const getQuickHabitConfig = (category: Category) => {
+  switch (category) {
+    case 'Fitness': return { color: '#12B886', icon: Dumbbell };
+    case 'Reading': return { color: '#FD7E14', icon: BookOpen };
+    case 'Productivity': return { color: '#FCC419', icon: Zap };
+    case 'Health': return { color: '#228BE6', icon: Brain };
+    case 'Mindfulness': return { color: '#845EF7', icon: Brain };
+    case 'Study': return { color: '#20C997', icon: Sparkles };
+    case 'Social': return { color: '#B54708', icon: Navigation };
+    default: return { color: '#868E96', icon: Sparkles };
+  }
+};
+
+interface QuickRoutineSheetProps {
+  routine: Routine | null;
+  habits: Habit[];
+  onClose: () => void;
+  onLogHabit: LogHabitHandler;
+}
+
+function QuickRoutineSheet({ routine, habits, onClose, onLogHabit }: QuickRoutineSheetProps) {
+  const [isCompletingAll, setIsCompletingAll] = useState(false);
+
+  React.useEffect(() => {
+    if (!routine) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [routine, onClose]);
+
+  if (!routine) return null;
+
+  const completedCount = habits.filter(h => (h.history[dateToday] || 0) >= h.target).length;
+  const totalCount = habits.length;
+  const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+  const allDone = totalCount > 0 && completedCount === totalCount;
+
+  const handleCompleteHabit = (habit: Habit) => {
+    const current = habit.history[dateToday] || 0;
+    const remaining = Math.max(0, habit.target - current);
+    if (remaining <= 0) return;
+
+    onLogHabit(habit.id, remaining);
+  };
+
+  const handleCompleteAll = async () => {
+    if (isCompletingAll || allDone) return;
+
+    setIsCompletingAll(true);
+    try {
+      for (const habit of habits) {
+        const current = habit.history[dateToday] || 0;
+        const remaining = Math.max(0, habit.target - current);
+        if (remaining > 0) {
+          await Promise.resolve(onLogHabit(habit.id, remaining));
+        }
+      }
+    } finally {
+      setIsCompletingAll(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[80] flex items-end justify-center" role="dialog" aria-modal="true" aria-labelledby="quick-routine-sheet-title">
+      <button
+        type="button"
+        aria-label="Close routine"
+        onClick={onClose}
+        className="absolute inset-0 bg-black/65 backdrop-blur-sm cursor-default routine-sheet-backdrop"
+      />
+
+      <section className="routine-sheet-panel relative z-10 w-full max-w-[560px] max-h-[86vh] overflow-y-auto bg-[#10121A] border border-[#2B3040] border-b-0 rounded-t-[24px] shadow-[0_-22px_70px_rgba(0,0,0,0.55)] pb-[calc(24px+env(safe-area-inset-bottom,0px))]">
+        <div className="sticky top-0 z-20 bg-[#10121A]/95 backdrop-blur-xl border-b border-[#202434] rounded-t-[24px]">
+          <div className="flex justify-center py-3">
+            <div className="h-1 w-11 rounded-full bg-[#343B50]" />
+          </div>
+
+          <div className="px-4 md:px-5 pb-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-purple-500/20 bg-purple-500/10 text-purple-300">
+                    <Navigation className="h-4.5 w-4.5" />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 id="quick-routine-sheet-title" className="text-lg font-extrabold text-white truncate">
+                      {routine.name}
+                    </h3>
+                    <div className="flex items-center gap-2 text-[10px] font-mono font-bold uppercase tracking-widest">
+                      <span className="text-purple-300">{routine.timeBlock}</span>
+                      <span className="text-gray-700">/</span>
+                      <span className="inline-flex items-center gap-1 text-[#FCC419]">
+                        <Zap className="h-3 w-3 fill-[#FCC419]" />
+                        {routine.points} XP
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={onClose}
+                className="h-9 w-9 shrink-0 rounded-full border border-[#2B3040] bg-[#181B25] text-gray-400 hover:text-white hover:bg-[#202434] transition flex items-center justify-center"
+                aria-label="Close routine sheet"
+              >
+                <X className="h-4.5 w-4.5" />
+              </button>
+            </div>
+
+            <div className="mt-3 rounded-xl border border-[#252B3A] bg-[#151822] p-3.5">
+              <div className="flex items-center justify-between text-xs font-semibold mb-2">
+                <span className="text-gray-400">Overall Progress</span>
+                <span className={allDone ? 'text-[#12B886]' : 'text-purple-300'}>
+                  {completedCount}/{totalCount} done
+                </span>
+              </div>
+              <div className="h-2 rounded-full bg-[#0D0F17] border border-[#242938] overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-purple-500 to-indigo-400 transition-all duration-500"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <div className="mt-1.5 text-right text-[10px] font-mono text-gray-500">{progress}%</div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleCompleteAll}
+              disabled={allDone || isCompletingAll || totalCount === 0}
+              className="mt-3 w-full min-h-[46px] rounded-xl border border-[#12B886]/25 bg-[#12B886]/12 text-[#12B886] hover:bg-[#12B886]/20 disabled:bg-[#151822] disabled:text-gray-600 disabled:border-[#252B3A] font-extrabold text-sm transition flex items-center justify-center gap-2 active:scale-[0.99]"
+            >
+              <Zap className="h-4 w-4 fill-current" />
+              <span>{allDone ? 'Routine Complete' : isCompletingAll ? 'Completing...' : '1-TAP Complete All'}</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="px-4 md:px-5 pt-3 space-y-2.5">
+          {habits.map((habit) => {
+            const current = habit.history[dateToday] || 0;
+            const percentage = Math.min(100, Math.round((current / habit.target) * 100));
+            const isCompleted = current >= habit.target;
+            const config = getQuickHabitConfig(habit.category);
+            const Icon = config.icon;
+
+            return (
+              <div
+                key={habit.id}
+                className={`relative overflow-hidden rounded-2xl border bg-[#141720] p-3.5 transition ${
+                  isCompleted ? 'border-[#12B886]/20 opacity-75' : 'border-[#252B3A]'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className="h-11 w-11 shrink-0 rounded-full border flex items-center justify-center"
+                    style={{ backgroundColor: `${config.color}14`, borderColor: `${config.color}28`, color: config.color }}
+                  >
+                    <Icon className="h-5 w-5" />
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <h4 className="truncate text-[15px] font-bold text-white">{habit.name}</h4>
+                      {isCompleted && (
+                        <span className="shrink-0 rounded border border-[#12B886]/20 bg-[#12B886]/10 px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase text-[#12B886]">
+                          Done
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-1 flex items-center gap-1.5 text-[10px] font-semibold">
+                      <span style={{ color: config.color }}>{habit.category}</span>
+                      <span className="text-gray-700">/</span>
+                      <span className="text-[#FCC419]">{habit.routineId ? 0 : habit.points} pts</span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleCompleteHabit(habit)}
+                    disabled={isCompleted}
+                    aria-label={isCompleted ? `${habit.name} complete` : `Complete ${habit.name}`}
+                    className={`h-10 w-10 shrink-0 rounded-full border-2 transition flex items-center justify-center active:scale-95 ${
+                      isCompleted
+                        ? 'border-[#12B886] bg-[#12B886] text-black'
+                        : 'border-[#30364A] bg-transparent hover:border-[#12B886] hover:bg-[#12B886]/10'
+                    }`}
+                  >
+                    {isCompleted && <Check className="h-4.5 w-4.5 stroke-[3px]" />}
+                  </button>
+                </div>
+
+                <div className="mt-3 flex items-center gap-2">
+                  <div className="h-1.5 flex-1 overflow-hidden rounded-full border border-[#242938] bg-[#0D0F17]">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${percentage}%`, backgroundColor: config.color, boxShadow: `0 0 6px ${config.color}` }}
+                    />
+                  </div>
+                  <span className="w-9 text-right text-[10px] font-mono text-gray-500">{percentage}%</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+    </div>
+  );
+}
+
 interface DashboardProps {
   habits: Habit[];
   routines: Routine[];
   userPoints: number;
-  onLogHabit: (id: string, value: number) => void;
+  onLogHabit: LogHabitHandler;
   setTab: (tab: string) => void;
   onNavigateToRoutine: (routineId: string) => void;
   selectedCategoryId: Category | null;
@@ -140,9 +363,7 @@ export default function Dashboard({
 
   const [quickVals, setQuickVals] = useState<{ [key: string]: string }>({});
   const [timeframeFilter, setTimeframeFilter] = useState<'All' | 'Morning' | 'Evening' | 'Night'>('All');
-  const [focusRoutineId, setFocusRoutineId] = useState<string | null>(null);
-  const [showAllQuickHabits, setShowAllQuickHabits] = useState(false);
-  const [collapsedRoutines, setCollapsedRoutines] = useState<Set<string>>(new Set());
+  const [selectedRoutineSheetId, setSelectedRoutineSheetId] = useState<string | null>(null);
 
   const journeyStartDate = localStorage.getItem('habit_mountain_journey_start_date');
   let activeGrowthValue = 0.0;
@@ -535,27 +756,19 @@ export default function Dashboard({
           const nightCount = allHabits.filter(h => getHabitTimeframe(h, routines) === 'Night').length;
 
           // Standalone habits (not in any routine), filtered by timeframe
-          const standaloneHabits = allHabits.filter(h => !h.routineId && habitMatchesTimeframe(h));
-
-          const getCategoryConfigLocal = (category: Category) => {
-            switch (category) {
-              case 'Fitness': return { color: '#12B886', icon: Dumbbell };
-              case 'Reading': return { color: '#FD7E14', icon: BookOpen };
-              case 'Productivity': return { color: '#FCC419', icon: Zap };
-              case 'Health': return { color: '#228BE6', icon: Brain };
-              case 'Mindfulness': return { color: '#845EF7', icon: Brain };
-              case 'Study': return { color: '#20C997', icon: Sparkles };
-              case 'Social': return { color: '#B54708', icon: Navigation };
-              default: return { color: '#868E96', icon: Sparkles };
-            }
-          };
+          const routineHabitIds = new Set(routines.flatMap(rt => rt.habitIds));
+          const standaloneHabits = allHabits.filter(h => !routineHabitIds.has(h.id) && !h.routineId && habitMatchesTimeframe(h));
+          const selectedRoutine = routines.find(rt => rt.id === selectedRoutineSheetId) || null;
+          const selectedRoutineHabits = selectedRoutine
+            ? habits.filter(h => selectedRoutine.habitIds.includes(h.id) && habitMatchesTimeframe(h))
+            : [];
 
           const HabitCard = ({ item }: { item: Habit }) => {
             const progressVal = item.history[dateToday] || 0;
             const percentage = Math.min(100, Math.round((progressVal / item.target) * 100));
             const isCompleted = progressVal >= item.target;
             const remaining = Math.max(0, item.target - progressVal);
-            const config = getCategoryConfigLocal(item.category);
+            const config = getQuickHabitConfig(item.category);
             const IconComp = config.icon;
             return (
               <div
@@ -660,64 +873,58 @@ export default function Dashboard({
                     const doneCount = rtHabits.filter(h => (h.history[dateToday] || 0) >= h.target).length;
                     const totalCount = rtHabits.length;
                     const rtProgress = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
-                    const isCollapsed = collapsedRoutines.has(rt.id);
-                    const allDone = doneCount === totalCount;
+                    const allDone = totalCount > 0 && doneCount === totalCount;
 
                     return (
-                      <div key={rt.id} className="rounded-xl border border-[#845EF7]/20 overflow-hidden bg-[#0F1018]">
-                        {/* Routine Header — tap to collapse */}
-                        <button
-                          onClick={() => setCollapsedRoutines(prev => {
-                            const next = new Set(prev);
-                            next.has(rt.id) ? next.delete(rt.id) : next.add(rt.id);
-                            return next;
-                          })}
-                          className="w-full flex items-center gap-3 md:gap-2.5 px-3.5 md:px-3 py-3 md:py-2 hover:bg-[#845EF7]/5 transition-colors duration-200 cursor-pointer select-none"
-                        >
-                          {/* Purple left accent */}
-                          <div className="w-1 h-7 md:h-6 rounded-full bg-[#845EF7] shrink-0" />
-                          {/* Routine name + timeblock */}
-                          <div className="flex-1 min-w-0 text-left">
+                      <button
+                        key={rt.id}
+                        type="button"
+                        onClick={() => setSelectedRoutineSheetId(rt.id)}
+                        aria-label={`Open ${rt.name} routine`}
+                        className={`w-full rounded-xl border text-left overflow-hidden bg-[#0F1018] hover:bg-[#151826] transition-all duration-200 cursor-pointer select-none shadow-sm active:scale-[0.99] ${
+                          allDone ? 'border-[#12B886]/25' : 'border-[#845EF7]/20 hover:border-[#845EF7]/40'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 md:gap-2.5 px-3.5 md:px-3 py-3 md:py-2.5">
+                          <div className="w-1 h-8 md:h-7 rounded-full bg-[#845EF7] shrink-0" />
+                          <div className="h-10 w-10 md:h-8 md:w-8 rounded-full border border-[#845EF7]/20 bg-[#845EF7]/10 text-[#B197FC] flex items-center justify-center shrink-0">
+                            <Navigation className="w-4.5 h-4.5 md:w-3.5 md:h-3.5" />
+                          </div>
+
+                          <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 md:gap-1.5">
-                              <span className="text-[14px] md:text-[11px] font-bold text-white truncate">🔄 {rt.name}</span>
+                              <span className="text-[14px] md:text-[12px] font-bold text-white truncate">{rt.name}</span>
                               {rt.timeBlock && (
                                 <span className="text-[10px] md:text-[8px] font-mono text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 md:px-1.5 rounded uppercase tracking-wider shrink-0">
                                   {rt.timeBlock}
                                 </span>
                               )}
                               {allDone && (
-                                <span className="text-[10px] md:text-[8px] font-mono text-[#12B886] bg-[#12B886]/10 border border-[#12B886]/20 px-2 py-0.5 md:px-1.5 rounded uppercase tracking-wider shrink-0 animate-pulse">
-                                  ✓ Done
+                                <span className="text-[10px] md:text-[8px] font-mono text-[#12B886] bg-[#12B886]/10 border border-[#12B886]/20 px-2 py-0.5 md:px-1.5 rounded uppercase tracking-wider shrink-0">
+                                  Done
                                 </span>
                               )}
                             </div>
-                            {/* Mini progress bar */}
+
                             <div className="flex items-center gap-2 md:gap-1.5 mt-1.5 md:mt-1">
                               <div className="flex-1 h-1.5 md:h-1 bg-gray-800 rounded-full overflow-hidden">
-                                <div className="h-full bg-[#845EF7] rounded-full transition-all duration-500"
-                                  style={{ width: `${rtProgress}%`, boxShadow: '0 0 4px #845EF7' }} />
+                                <div
+                                  className="h-full rounded-full bg-gradient-to-r from-purple-500 to-indigo-400 transition-all duration-500"
+                                  style={{ width: `${rtProgress}%`, boxShadow: '0 0 4px #845EF7' }}
+                                />
                               </div>
                               <span className="text-[11px] md:text-[9px] font-mono text-purple-400 shrink-0">{doneCount}/{totalCount}</span>
                             </div>
                           </div>
-                          {/* XP badge + chevron */}
+
                           <div className="flex items-center gap-2 md:gap-1.5 shrink-0">
                             <span className="text-[11px] md:text-[9px] font-mono font-bold text-[#FCC419] bg-[#FCC419]/10 border border-[#FCC419]/20 px-2 py-1 md:px-1.5 md:py-0.5 rounded">
                               +{rt.points}XP
                             </span>
-                            <svg className={`w-4.5 h-4.5 md:w-3.5 md:h-3.5 text-gray-500 transition-transform duration-200 ${isCollapsed ? '' : 'rotate-180'}`}
-                              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                              <path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
+                            <ChevronRight className="w-4.5 h-4.5 md:w-3.5 md:h-3.5 text-gray-500" />
                           </div>
-                        </button>
-                        {/* Habit cards inside routine */}
-                        {!isCollapsed && (
-                          <div className="flex flex-col gap-2 md:gap-1.5 px-2.5 md:px-2 pb-2.5 md:pb-2">
-                            {rtHabits.map(item => <HabitCard key={item.id} item={item} />)}
-                          </div>
-                        )}
-                      </div>
+                        </div>
+                      </button>
                     );
                   })}
 
@@ -729,11 +936,22 @@ export default function Dashboard({
                           Individual Habits
                         </div>
                       )}
-                      {standaloneHabits.map(item => <HabitCard key={item.id} item={item} />)}
+                      {standaloneHabits.map(item => (
+                        <React.Fragment key={item.id}>
+                          <HabitCard item={item} />
+                        </React.Fragment>
+                      ))}
                     </div>
                   )}
                 </div>
               )}
+
+              <QuickRoutineSheet
+                routine={selectedRoutine}
+                habits={selectedRoutineHabits}
+                onClose={() => setSelectedRoutineSheetId(null)}
+                onLogHabit={onLogHabit}
+              />
             </div>
           );
         })()}
@@ -821,12 +1039,8 @@ export default function Dashboard({
                   <div
                     key={rt.id}
                     onClick={() => {
-                      setFocusRoutineId(rt.id);
                       setTimeframeFilter('All');
-                      const loggerSec = document.getElementById('quick-habit-logger-section');
-                      if (loggerSec) {
-                        loggerSec.scrollIntoView({ behavior: 'smooth' });
-                      }
+                      setSelectedRoutineSheetId(rt.id);
                     }}
                     className="bg-[#10121A] hover:bg-[#1E212E] border border-gray-800 p-3.5 rounded-xl cursor-pointer transition flex items-center justify-between group shadow"
                   >
