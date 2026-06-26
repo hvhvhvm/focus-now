@@ -11,10 +11,10 @@ import { useToast } from './Toast';
 
 // ─── CATEGORY CONFIG ───────────────────────────────────────────────────────────
 const CAT_CFG: Record<string, { color: string; emoji: string; icon: React.ElementType }> = {
-  Fitness:      { color: '#ff6b6b', emoji: '🏃', icon: Dumbbell },
+  Fitness:      { color: '#4ecf7f', emoji: '🏃', icon: Dumbbell },
   Reading:      { color: '#4f8ef7', emoji: '📚', icon: BookOpen },
   Productivity: { color: '#f5a623', emoji: '⚡', icon: Zap },
-  Health:       { color: '#4ecf7f', emoji: '💊', icon: Heart },
+  Health:       { color: '#ff6b6b', emoji: '❤️', icon: Heart },
   Mindfulness:  { color: '#38c4c4', emoji: '🧘', icon: Brain },
   Study:        { color: '#a78bf7', emoji: '📖', icon: Sparkles },
   Social:       { color: '#f76b8a', emoji: '👥', icon: Navigation },

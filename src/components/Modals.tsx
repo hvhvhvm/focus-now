@@ -71,7 +71,7 @@ export function CreateHabitModal({ isOpen, onClose, onCreate, onSave, habitToEdi
   // ✅ FIX: was "routineCategories" (undefined) — renamed to "categories" throughout
   const categories: { id: Category; label: string; icon: string; color: string; activeClass: string }[] = [
     { id: 'Health',       label: 'Health',       icon: '❤️',  color: 'text-rose-400',   activeClass: 'border-rose-500 bg-rose-500/10 text-rose-400 ring-2 ring-rose-500/5' },
-    { id: 'Fitness',      label: 'Fitness',      icon: '💪',  color: 'text-emerald-400', activeClass: 'border-emerald-500 bg-emerald-500/10 text-emerald-400 ring-2 ring-emerald-500/5' },
+    { id: 'Fitness',      label: 'Fitness',      icon: '🏃',  color: 'text-emerald-400', activeClass: 'border-emerald-500 bg-emerald-500/10 text-emerald-400 ring-2 ring-emerald-500/5' },
     { id: 'Study',        label: 'Study',        icon: '📝',  color: 'text-cyan-400',   activeClass: 'border-cyan-500 bg-cyan-500/10 text-cyan-400 ring-2 ring-cyan-500/5' },
     { id: 'Reading',      label: 'Reading',      icon: '📖',  color: 'text-purple-400', activeClass: 'border-purple-500 bg-purple-500/10 text-purple-400 ring-2 ring-purple-500/5' },
     { id: 'Productivity', label: 'Productivity', icon: '⚡',  color: 'text-amber-400',  activeClass: 'border-amber-500 bg-amber-500/10 text-amber-400 ring-2 ring-amber-500/5' },

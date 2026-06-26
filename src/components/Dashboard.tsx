@@ -11,11 +11,11 @@ type LogHabitHandler = (id: string, value: number) => void | Promise<void>;
 const getCategoryColor = (category: Category): string => {
   switch (category) {
     case 'Fitness':     return '#12B886';
-    case 'Reading':     return '#FD7E14';
+    case 'Reading':     return '#4f8ef7';
     case 'Productivity':return '#FCC419';
-    case 'Health':      return '#228BE6';
+    case 'Health':      return '#e86464';
     case 'Mindfulness': return '#845EF7';
-    case 'Study':       return '#20C997';
+    case 'Study':       return '#a78bf7';
     case 'Social':      return '#B54708';
     default:            return '#868E96';
   }
@@ -23,12 +23,12 @@ const getCategoryColor = (category: Category): string => {
 
 const getCategoryEmoji = (category: Category): string => {
   switch (category) {
-    case 'Fitness':     return '💪';
-    case 'Reading':     return '📖';
+    case 'Fitness':     return '🏃';
+    case 'Reading':     return '📚';
     case 'Productivity':return '⚡';
     case 'Health':      return '❤️';
     case 'Mindfulness': return '🧘';
-    case 'Study':       return '✏️';
+    case 'Study':       return '📖';
     case 'Social':      return '👥';
     default:            return '⭐';
   }
@@ -67,9 +67,9 @@ const getQuickHabitConfig = (category: Category) => {
     case 'Fitness':     return { color: '#12B886', icon: Dumbbell };
     case 'Reading':     return { color: '#FD7E14', icon: BookOpen };
     case 'Productivity':return { color: '#FCC419', icon: Zap };
-    case 'Health':      return { color: '#228BE6', icon: Brain };
+    case 'Health':      return { color: '#e86464', icon: Brain };
     case 'Mindfulness': return { color: '#845EF7', icon: Brain };
-    case 'Study':       return { color: '#20C997', icon: Sparkles };
+    case 'Study':       return { color: '#a78bf7', icon: Sparkles };
     case 'Social':      return { color: '#B54708', icon: Navigation };
     default:            return { color: '#868E96', icon: Sparkles };
   }
