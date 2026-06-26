@@ -314,6 +314,7 @@ function AppInner() {
     name: string;
     points: number;
     timeBlock: 'Morning' | 'Evening' | 'Night' | 'Constant';
+    category: Category;
     repeat: 'Daily' | 'Custom Days' | 'Today Only';
     habitNames: string[];
   }) => {
@@ -325,7 +326,7 @@ function AppInner() {
         const name = rtData.habitNames[i];
         const hRes = await api.createHabit({
           name,
-          category: rtData.timeBlock === 'Morning' ? 'Health' : 'Custom',
+          category: rtData.category || 'Custom',
           points: 10,
           type: 'Count',
           target: 10,
@@ -443,7 +444,7 @@ function AppInner() {
   }
 
   // Compute momentum live score
-  const { score: currentLiveMomentumScore } = calculateMomentum(habits);
+  const { score: currentLiveMomentumScore } = calculateMomentum(habits, routines);
 
   return (
     <div className="flex flex-col md:flex-row bg-[#0A0B0E] min-h-screen text-gray-100 font-sans antialiased overflow-x-hidden">
@@ -505,12 +506,14 @@ function AppInner() {
         {currentTab === '1%better' && (
           <OnePercentBetterPage
             habits={habits}
+            routines={routines}
           />
         )}
 
         {currentTab === 'insights' && (
           <InsightsPage
             habits={habits}
+            routines={routines}
             userPoints={userPoints}
           />
         )}
@@ -520,6 +523,7 @@ function AppInner() {
             currentUser={currentUser}
             userPoints={userPoints}
             habits={habits}
+            routines={routines}
             momentumScore={currentLiveMomentumScore}
             onLogout={handleLogout}
             onReset={handleResetApp}

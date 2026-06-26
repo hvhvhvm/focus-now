@@ -53,7 +53,45 @@ export const getScheduledHabits = (habits: Habit[], dateStr: string): Habit[] =>
   return habits.filter((habit) => isHabitScheduledForDate(habit, dateStr));
 };
 
-export const calculateHabitLogPoints = (habit: Habit, value: number): number => {
+export const isHabitInRoutine = (habit: Habit, routines: Routine[] = []): boolean => {
+  return Boolean(habit.routineId) || routines.some((routine) => routine.habitIds.includes(habit.id));
+};
+
+export const getStandaloneHabits = (habits: Habit[], routines: Routine[] = []): Habit[] => {
+  return habits.filter((habit) => !isHabitInRoutine(habit, routines));
+};
+
+export const getRoutineHabits = (routine: Routine, habits: Habit[], dateStr?: string): Habit[] => {
+  const routineHabits = habits.filter((habit) => routine.habitIds.includes(habit.id));
+  return dateStr ? getScheduledHabits(routineHabits, dateStr) : routineHabits;
+};
+
+export const isRoutineCompleteForDate = (routine: Routine, habits: Habit[], dateStr: string): boolean => {
+  const routineHabits = getRoutineHabits(routine, habits, dateStr);
+  return routineHabits.length > 0 && routineHabits.every((habit) => (habit.history[dateStr] || 0) >= habit.target);
+};
+
+export const getDailyTaskCounts = (
+  habits: Habit[],
+  routines: Routine[] = [],
+  dateStr: string
+): { done: number; total: number; progressPercent: number } => {
+  const scheduledStandaloneHabits = getScheduledHabits(getStandaloneHabits(habits, routines), dateStr);
+  const scheduledRoutines = routines.filter((routine) => {
+    return isRoutineScheduledForDate(routine, dateStr) && getRoutineHabits(routine, habits, dateStr).length > 0;
+  });
+
+  const habitsDone = scheduledStandaloneHabits.filter((habit) => (habit.history[dateStr] || 0) >= habit.target).length;
+  const routinesDone = scheduledRoutines.filter((routine) => isRoutineCompleteForDate(routine, habits, dateStr)).length;
+  const done = habitsDone + routinesDone;
+  const total = scheduledStandaloneHabits.length + scheduledRoutines.length;
+
+  return {
+    done,
+    total,
+    progressPercent: total > 0 ? Math.round((done / total) * 100) : 0
+  };
+};export const calculateHabitLogPoints = (habit: Habit, value: number): number => {
   if (habit.routineId) return 0;
   if (!Number.isFinite(value) || value <= 0 || habit.target <= 0) return 0;
   if (value >= habit.target) return habit.points + 5;
@@ -275,7 +313,11 @@ export const getInitialState = (): { habits: Habit[]; routines: Routine[]; total
 };
 
 // Helper to compute progression and momentum mechanics
-export const calculateCompletionRate = (habits: Habit[], dateStr: string): number => {
+export const calculateCompletionRate = (habits: Habit[], dateStr: string, routines: Routine[] = []): number => {
+  if (routines.length > 0) {
+    return getDailyTaskCounts(habits, routines, dateStr).progressPercent;
+  }
+
   const activeForDate = getScheduledHabits(habits, dateStr);
 
   if (activeForDate.length === 0) return 0;
@@ -290,17 +332,17 @@ export const calculateCompletionRate = (habits: Habit[], dateStr: string): numbe
   return Math.round((totalCompletedRatio / activeForDate.length) * 100);
 };
 
-export const getCompletionRateForDay = (habits: Habit[], dateStr: string): number => {
-  return calculateCompletionRate(habits, dateStr);
+export const getCompletionRateForDay = (habits: Habit[], dateStr: string, routines: Routine[] = []): number => {
+  return calculateCompletionRate(habits, dateStr, routines);
 };
 
 // Day Signal Target calculation:
 // Base Target = Day Completion % * 0.78
 // Streak Alive Bonus: +6% if streak is active (meaning D and D-1 are both >= 45%)
 // Recovery Bonus: +4% if D-1 was missed (< 45%) and D is active (>= 45%)
-export const getDaySignalTarget = (habits: Habit[], dateStr: string, prevDateStr: string): number => {
-  const progressToday = getCompletionRateForDay(habits, dateStr);
-  const progressPrev = getCompletionRateForDay(habits, prevDateStr);
+export const getDaySignalTarget = (habits: Habit[], dateStr: string, prevDateStr: string, routines: Routine[] = []): number => {
+  const progressToday = getCompletionRateForDay(habits, dateStr, routines);
+  const progressPrev = getCompletionRateForDay(habits, prevDateStr, routines);
 
   const baseTarget = progressToday * 0.78;
   const isStreakActive = (progressToday >= 45) && (progressPrev >= 45);
@@ -312,7 +354,7 @@ export const getDaySignalTarget = (habits: Habit[], dateStr: string, prevDateStr
   return Math.min(100, Math.max(0, baseTarget + streakBonus + recoveryBonus));
 };
 
-export const calculateMomentum = (habits: Habit[]): {
+export const calculateMomentum = (habits: Habit[], routines: Routine[] = []): {
   todayProgress: number;
   score: number;
   threeDayAvg: number;
@@ -320,9 +362,9 @@ export const calculateMomentum = (habits: Habit[]): {
   trajectory: number; // trend contrast vs yesterday
   stateName: 'INERTIA' | 'IGNITE' | 'FLOW' | 'LOCKED';
 } => {
-  const todayProgress = calculateCompletionRate(habits, dateToday);
-  const yesterdayProgress = calculateCompletionRate(habits, dateYesterday);
-  const twoDaysAgoProgress = calculateCompletionRate(habits, dateTwoDaysAgo);
+  const todayProgress = calculateCompletionRate(habits, dateToday, routines);
+  const yesterdayProgress = calculateCompletionRate(habits, dateYesterday, routines);
+  const twoDaysAgoProgress = calculateCompletionRate(habits, dateTwoDaysAgo, routines);
 
   // 3-day roll average: today, yesterday, 2 days ago
   const threeDayAvg = Math.round((todayProgress + yesterdayProgress + twoDaysAgoProgress) / 3);
@@ -359,7 +401,7 @@ export const calculateMomentum = (habits: Habit[]): {
 };
 
 // Computes 1% better signal rolling 5-day average
-export const getOnePercentBetterHistory = (habits: Habit[]): {
+export const getOnePercentBetterHistory = (habits: Habit[], routines: Routine[] = []): {
   date: string;
   progress: number;
   signal: number;
@@ -377,7 +419,7 @@ export const getOnePercentBetterHistory = (habits: Habit[]): {
   for (let i = 1; i < allDates.length; i++) {
     const todayStr = allDates[i];
     const prevStr = allDates[i - 1];
-    targetsMap[todayStr] = getDaySignalTarget(habits, todayStr, prevStr);
+    targetsMap[todayStr] = getDaySignalTarget(habits, todayStr, prevStr, routines);
   }
   // For index 0, duplicate index 1
   targetsMap[allDates[0]] = targetsMap[allDates[1]];
@@ -403,7 +445,7 @@ export const getOnePercentBetterHistory = (habits: Habit[]): {
     });
     const signalVal = Math.round((sum / 5) * 10) / 10;
     
-    const progress = getCompletionRateForDay(habits, dateStr);
+    const progress = getCompletionRateForDay(habits, dateStr, routines);
 
     return {
       date: dateStr,
@@ -413,3 +455,6 @@ export const getOnePercentBetterHistory = (habits: Habit[]): {
     };
   });
 };
+
+
+

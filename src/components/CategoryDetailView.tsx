@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { ChevronLeft, Zap, Clock, RotateCcw, Check, Sparkles, AlertCircle } from 'lucide-react';
 import { Habit, Category, Routine } from '../types';
-import { dateToday } from '../data';
+import { dateToday, getStandaloneHabits } from '../data';
 
 interface CategoryDetailViewProps {
   category: Category;
   habits: Habit[];
+  routines?: Routine[];
   onLogHabit: (id: string, value: number) => void;
   onBack: () => void;
 }
@@ -107,12 +108,13 @@ export const getCategoryStyles = (category: Category) => {
 export default function CategoryDetailView({
   category,
   habits,
+  routines = [],
   onLogHabit,
   onBack
 }: CategoryDetailViewProps) {
   const [inputVals, setInputVals] = useState<{ [key: string]: string }>({});
 
-  const categoryHabits = habits.filter((h) => h.category === category);
+  const categoryHabits = getStandaloneHabits(habits, routines).filter((h) => h.category === category);
   const doneCount = categoryHabits.filter((h) => (h.history[dateToday] || 0) >= h.target).length;
   const totalCount = categoryHabits.length;
   const progressPercent = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;

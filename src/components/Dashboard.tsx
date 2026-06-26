@@ -1,85 +1,249 @@
 import React, { useState } from 'react';
 import { Zap, AlertTriangle, ArrowUpRight, TrendingUp, Dumbbell, BookOpen, Brain, Sparkles, CheckCircle2, Navigation, Clock, Check, ChevronRight, X } from 'lucide-react';
 import { Habit, Category, Routine } from '../types';
-import { calculateMomentum, dateToday } from '../data';
+import { calculateMomentum, dateToday, getDailyTaskCounts, getStandaloneHabits } from '../data';
 import CategoryDetailView from './CategoryDetailView';
 
 type LogHabitHandler = (id: string, value: number) => void | Promise<void>;
 
+// ─── CATEGORY CONFIG ──────────────────────────────────────────────────────────
+
 const getCategoryColor = (category: Category): string => {
   switch (category) {
-    case 'Fitness':
-      return '#12B886'; // Neon emerald
-    case 'Reading':
-      return '#FD7E14'; // Warm orange
-    case 'Productivity':
-      return '#FCC419'; // Amber yellow
-    case 'Health':
-      return '#228BE6'; // Clear blue
-    case 'Mindfulness':
-      return '#845EF7'; // Deep purple
-    case 'Study':
-      return '#20C997'; // Teal
-    case 'Social':
-      return '#B54708'; // Rust brown / deep orange
-    default:
-      return '#868E96'; // Slate grey
+    case 'Fitness':     return '#12B886';
+    case 'Reading':     return '#FD7E14';
+    case 'Productivity':return '#FCC419';
+    case 'Health':      return '#228BE6';
+    case 'Mindfulness': return '#845EF7';
+    case 'Study':       return '#20C997';
+    case 'Social':      return '#B54708';
+    default:            return '#868E96';
   }
 };
 
-const getHabitTimeframe = (habit: Habit, routines: Routine[]): 'Morning' | 'Evening' | 'Night' => {
+const getCategoryEmoji = (category: Category): string => {
+  switch (category) {
+    case 'Fitness':     return '💪';
+    case 'Reading':     return '📖';
+    case 'Productivity':return '⚡';
+    case 'Health':      return '❤️';
+    case 'Mindfulness': return '🧘';
+    case 'Study':       return '✏️';
+    case 'Social':      return '👥';
+    default:            return '⭐';
+  }
+};
+
+const getHabitTimeframe = (habit: Habit, routines: Routine[]): 'Morning' | 'Evening' | 'Night' | 'Anytime' => {
   const parentRoutine = routines.find(r => r.habitIds.includes(habit.id));
   if (parentRoutine) {
     if (parentRoutine.timeBlock === 'Morning') return 'Morning';
     if (parentRoutine.timeBlock === 'Evening') return 'Evening';
     if (parentRoutine.timeBlock === 'Night') return 'Night';
+    return 'Anytime';
   }
-
   if (habit.timeOfDay) {
-    const tod = habit.timeOfDay.toLowerCase();
-    if (tod.includes('morning') || tod.includes('am')) return 'Morning';
-    if (tod.includes('evening') || tod.includes('afternoon')) return 'Evening';
-    if (tod.includes('night') || tod.includes('pm')) {
-      const match = tod.match(/(\d+):(\d+)/);
-      if (match) {
-        const hour = parseInt(match[1]);
-        const isPM = tod.includes('pm') || tod.includes('night');
-        let clockHour = hour;
-        if (isPM && hour < 12) clockHour += 12;
-        if (!isPM && hour === 12) clockHour = 0;
-        
-        if (clockHour >= 4 && clockHour < 12) return 'Morning';
-        if (clockHour >= 12 && clockHour < 18) return 'Evening';
-        return 'Night';
-      }
+    const tod = habit.timeOfDay.toLowerCase().trim();
+    if (tod === 'anytime' || tod === 'constant' || tod === 'none') return 'Anytime';
+    const match = tod.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/);
+    if (match) {
+      let clockHour = parseInt(match[1], 10);
+      const meridiem = match[3];
+      if (meridiem === 'pm' && clockHour < 12) clockHour += 12;
+      if (meridiem === 'am' && clockHour === 12) clockHour = 0;
+      if (clockHour >= 4 && clockHour < 12) return 'Morning';
+      if (clockHour >= 12 && clockHour < 18) return 'Evening';
       return 'Night';
     }
+    if (tod.includes('morning')) return 'Morning';
+    if (tod.includes('evening') || tod.includes('afternoon')) return 'Evening';
+    if (tod.includes('night')) return 'Night';
   }
-
-  const name = habit.name.toLowerCase();
-  if (name.includes('morning') || name.includes('run') || name.includes('jump') || name.includes('pull') || name.includes('fitness')) return 'Morning';
-  if (name.includes('stretch') || name.includes('evening') || name.includes('read') || name.includes('practice')) return 'Evening';
-  if (name.includes('night') || name.includes('sleep') || name.includes('meditation') || name.includes('plank')) return 'Night';
-
-  const charCodeSum = habit.id.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
-  const mod = charCodeSum % 3;
-  if (mod === 0) return 'Morning';
-  if (mod === 1) return 'Evening';
-  return 'Night';
+  return 'Anytime';
 };
 
 const getQuickHabitConfig = (category: Category) => {
   switch (category) {
-    case 'Fitness': return { color: '#12B886', icon: Dumbbell };
-    case 'Reading': return { color: '#FD7E14', icon: BookOpen };
-    case 'Productivity': return { color: '#FCC419', icon: Zap };
-    case 'Health': return { color: '#228BE6', icon: Brain };
+    case 'Fitness':     return { color: '#12B886', icon: Dumbbell };
+    case 'Reading':     return { color: '#FD7E14', icon: BookOpen };
+    case 'Productivity':return { color: '#FCC419', icon: Zap };
+    case 'Health':      return { color: '#228BE6', icon: Brain };
     case 'Mindfulness': return { color: '#845EF7', icon: Brain };
-    case 'Study': return { color: '#20C997', icon: Sparkles };
-    case 'Social': return { color: '#B54708', icon: Navigation };
-    default: return { color: '#868E96', icon: Sparkles };
+    case 'Study':       return { color: '#20C997', icon: Sparkles };
+    case 'Social':      return { color: '#B54708', icon: Navigation };
+    default:            return { color: '#868E96', icon: Sparkles };
   }
 };
+
+// ─── CATEGORY RING COMPONENT ──────────────────────────────────────────────────
+
+interface CategoryRingProps {
+  category: Category;
+  pct: number;
+  onClick: () => void;
+}
+
+function CategoryRing({ category, pct, onClick }: CategoryRingProps) {
+  const color = getCategoryColor(category);
+  const emoji = getCategoryEmoji(category);
+  const size = 56;
+  const stroke = 4;
+  const r = (size - stroke * 2) / 2;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (pct / 100) * circ;
+
+  return (
+    <div
+      onClick={onClick}
+      className="flex flex-col items-center gap-1.5 cursor-pointer group flex-shrink-0"
+      style={{ minWidth: 64 }}
+    >
+      <div className="relative" style={{ width: size, height: size }}>
+        <svg
+          width={size}
+          height={size}
+          viewBox={`0 0 ${size} ${size}`}
+          style={{ transform: 'rotate(-90deg)' }}
+        >
+          <circle
+            cx={size / 2} cy={size / 2} r={r}
+            fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={stroke}
+          />
+          <circle
+            cx={size / 2} cy={size / 2} r={r}
+            fill="none" stroke={color} strokeWidth={stroke}
+            strokeDasharray={circ}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            style={{
+              transition: 'stroke-dashoffset 0.6s ease',
+              filter: pct > 0 ? `drop-shadow(0 0 5px ${color}99)` : 'none',
+            }}
+          />
+        </svg>
+        {/* Emoji center */}
+        <div
+          className="absolute inset-0 flex items-center justify-center text-[18px] group-hover:scale-110 transition-transform duration-200"
+        >
+          {emoji}
+        </div>
+        {/* Active glow border */}
+        {pct === 100 && (
+          <div
+            className="absolute inset-0 rounded-full"
+            style={{
+              boxShadow: `0 0 12px ${color}66`,
+              borderRadius: '50%',
+              pointerEvents: 'none',
+            }}
+          />
+        )}
+      </div>
+      <div
+        className="text-[9px] font-mono font-bold text-center leading-tight truncate max-w-[60px]"
+        style={{ color: pct > 0 ? color : 'rgba(255,255,255,0.25)' }}
+      >
+        {pct > 0 ? `${pct}%` : category.slice(0, 5)}
+      </div>
+      <div className="text-[8px] text-center text-gray-600 truncate max-w-[60px]">
+        {category}
+      </div>
+    </div>
+  );
+}
+
+// ─── CATEGORY RINGS CARD ──────────────────────────────────────────────────────
+
+interface CategoryRingsCardProps {
+  categories: Category[];
+  getCategoryStats: (cat: Category) => number;
+  overallAvg: number;
+  onSelectCategory: (cat: Category) => void;
+}
+
+function CategoryRingsCard({ categories, getCategoryStats, overallAvg, onSelectCategory }: CategoryRingsCardProps) {
+  const scoreColor =
+    overallAvg >= 80 ? '#12B886' :
+    overallAvg >= 50 ? '#228BE6' :
+    overallAvg >= 20 ? '#FCC419' : '#FA5252';
+
+  if (categories.length === 0) return null;
+
+  return (
+    <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-4 relative overflow-hidden">
+      {/* Subtle glow */}
+      <div
+        className="absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl pointer-events-none"
+        style={{ background: `radial-gradient(circle, ${scoreColor}0a 0%, transparent 70%)` }}
+      />
+
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <div className="text-[10px] font-mono text-gray-500 tracking-widest uppercase">
+            CATEGORY SCORE
+          </div>
+          <div
+            className="text-xl font-extrabold font-mono mt-0.5 transition-colors duration-500"
+            style={{ color: scoreColor }}
+          >
+            {overallAvg}%
+          </div>
+        </div>
+        <div className="text-[10px] font-mono text-gray-600 text-right">
+          Tap a ring<br />to filter ↓
+        </div>
+      </div>
+
+      {/* Rings row */}
+      <div className="flex gap-3 overflow-x-auto scrollbar-none pb-1">
+        {categories.map(cat => (
+          <CategoryRing
+            key={cat}
+            category={cat}
+            pct={getCategoryStats(cat)}
+            onClick={() => onSelectCategory(cat)}
+          />
+        ))}
+      </div>
+
+      {/* Multi-segment bar */}
+      <div className="flex gap-1 mt-4">
+        {categories.map(cat => {
+          const pct = getCategoryStats(cat);
+          const color = getCategoryColor(cat);
+          return (
+            <div
+              key={cat}
+              className="flex-1 h-1.5 rounded-full overflow-hidden"
+              style={{ background: 'rgba(255,255,255,0.06)' }}
+            >
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${pct}%`,
+                  background: color,
+                  boxShadow: pct > 0 ? `0 0 4px ${color}88` : 'none',
+                }}
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Category emoji legend */}
+      <div className="flex gap-1 mt-1.5">
+        {categories.map(cat => (
+          <div key={cat} className="flex-1 text-center text-[9px] text-gray-700">
+            {getCategoryEmoji(cat)}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── QUICK ROUTINE SHEET ──────────────────────────────────────────────────────
 
 interface QuickRoutineSheetProps {
   routine: Routine | null;
@@ -93,14 +257,9 @@ function QuickRoutineSheet({ routine, habits, onClose, onLogHabit }: QuickRoutin
 
   React.useEffect(() => {
     if (!routine) return;
-
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKeyDown);
     return () => {
       document.body.style.overflow = previousOverflow;
@@ -119,21 +278,17 @@ function QuickRoutineSheet({ routine, habits, onClose, onLogHabit }: QuickRoutin
     const current = habit.history[dateToday] || 0;
     const remaining = Math.max(0, habit.target - current);
     if (remaining <= 0) return;
-
     onLogHabit(habit.id, remaining);
   };
 
   const handleCompleteAll = async () => {
     if (isCompletingAll || allDone) return;
-
     setIsCompletingAll(true);
     try {
       for (const habit of habits) {
         const current = habit.history[dateToday] || 0;
         const remaining = Math.max(0, habit.target - current);
-        if (remaining > 0) {
-          await Promise.resolve(onLogHabit(habit.id, remaining));
-        }
+        if (remaining > 0) await Promise.resolve(onLogHabit(habit.id, remaining));
       }
     } finally {
       setIsCompletingAll(false);
@@ -142,19 +297,14 @@ function QuickRoutineSheet({ routine, habits, onClose, onLogHabit }: QuickRoutin
 
   return (
     <div className="fixed inset-0 z-[80] flex items-end justify-center" role="dialog" aria-modal="true" aria-labelledby="quick-routine-sheet-title">
-      <button
-        type="button"
-        aria-label="Close routine"
-        onClick={onClose}
-        className="absolute inset-0 bg-black/65 backdrop-blur-sm cursor-default routine-sheet-backdrop"
-      />
+      <button type="button" aria-label="Close routine" onClick={onClose}
+        className="absolute inset-0 bg-black/65 backdrop-blur-sm cursor-default routine-sheet-backdrop" />
 
       <section className="routine-sheet-panel relative z-10 w-full max-w-[560px] max-h-[86vh] overflow-y-auto bg-[#10121A] border border-[#2B3040] border-b-0 rounded-t-[24px] shadow-[0_-22px_70px_rgba(0,0,0,0.55)] pb-[calc(24px+env(safe-area-inset-bottom,0px))]">
         <div className="sticky top-0 z-20 bg-[#10121A]/95 backdrop-blur-xl border-b border-[#202434] rounded-t-[24px]">
           <div className="flex justify-center py-3">
             <div className="h-1 w-11 rounded-full bg-[#343B50]" />
           </div>
-
           <div className="px-4 md:px-5 pb-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -170,20 +320,15 @@ function QuickRoutineSheet({ routine, habits, onClose, onLogHabit }: QuickRoutin
                       <span className="text-purple-300">{routine.timeBlock}</span>
                       <span className="text-gray-700">/</span>
                       <span className="inline-flex items-center gap-1 text-[#FCC419]">
-                        <Zap className="h-3 w-3 fill-[#FCC419]" />
-                        {routine.points} XP
+                        <Zap className="h-3 w-3 fill-[#FCC419]" />{routine.points} XP
                       </span>
                     </div>
                   </div>
                 </div>
               </div>
-
-              <button
-                type="button"
-                onClick={onClose}
+              <button type="button" onClick={onClose}
                 className="h-9 w-9 shrink-0 rounded-full border border-[#2B3040] bg-[#181B25] text-gray-400 hover:text-white hover:bg-[#202434] transition flex items-center justify-center"
-                aria-label="Close routine sheet"
-              >
+                aria-label="Close routine sheet">
                 <X className="h-4.5 w-4.5" />
               </button>
             </div>
@@ -191,25 +336,18 @@ function QuickRoutineSheet({ routine, habits, onClose, onLogHabit }: QuickRoutin
             <div className="mt-3 rounded-xl border border-[#252B3A] bg-[#151822] p-3.5">
               <div className="flex items-center justify-between text-xs font-semibold mb-2">
                 <span className="text-gray-400">Overall Progress</span>
-                <span className={allDone ? 'text-[#12B886]' : 'text-purple-300'}>
-                  {completedCount}/{totalCount} done
-                </span>
+                <span className={allDone ? 'text-[#12B886]' : 'text-purple-300'}>{completedCount}/{totalCount} done</span>
               </div>
               <div className="h-2 rounded-full bg-[#0D0F17] border border-[#242938] overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-purple-500 to-indigo-400 transition-all duration-500"
-                  style={{ width: `${progress}%` }}
-                />
+                <div className="h-full rounded-full bg-gradient-to-r from-purple-500 to-indigo-400 transition-all duration-500"
+                  style={{ width: `${progress}%` }} />
               </div>
               <div className="mt-1.5 text-right text-[10px] font-mono text-gray-500">{progress}%</div>
             </div>
 
-            <button
-              type="button"
-              onClick={handleCompleteAll}
+            <button type="button" onClick={handleCompleteAll}
               disabled={allDone || isCompletingAll || totalCount === 0}
-              className="mt-3 w-full min-h-[46px] rounded-xl border border-[#12B886]/25 bg-[#12B886]/12 text-[#12B886] hover:bg-[#12B886]/20 disabled:bg-[#151822] disabled:text-gray-600 disabled:border-[#252B3A] font-extrabold text-sm transition flex items-center justify-center gap-2 active:scale-[0.99]"
-            >
+              className="mt-3 w-full min-h-[46px] rounded-xl border border-[#12B886]/25 bg-[#12B886]/12 text-[#12B886] hover:bg-[#12B886]/20 disabled:bg-[#151822] disabled:text-gray-600 disabled:border-[#252B3A] font-extrabold text-sm transition flex items-center justify-center gap-2 active:scale-[0.99]">
               <Zap className="h-4 w-4 fill-current" />
               <span>{allDone ? 'Routine Complete' : isCompletingAll ? 'Completing...' : '1-TAP Complete All'}</span>
             </button>
@@ -223,60 +361,45 @@ function QuickRoutineSheet({ routine, habits, onClose, onLogHabit }: QuickRoutin
             const isCompleted = current >= habit.target;
             const config = getQuickHabitConfig(habit.category);
             const Icon = config.icon;
-
             return (
-              <div
-                key={habit.id}
-                className={`relative overflow-hidden rounded-2xl border bg-[#141720] p-3.5 transition ${
-                  isCompleted ? 'border-[#12B886]/20 opacity-75' : 'border-[#252B3A]'
-                }`}
-              >
+              <div key={habit.id}
+                className={`relative overflow-hidden rounded-2xl border bg-[#141720] p-3.5 transition ${isCompleted ? 'border-[#12B886]/20 opacity-75' : 'border-[#252B3A]'}`}>
                 <div className="flex items-center gap-3">
-                  <div
-                    className="h-11 w-11 shrink-0 rounded-full border flex items-center justify-center"
-                    style={{ backgroundColor: `${config.color}14`, borderColor: `${config.color}28`, color: config.color }}
-                  >
+                  <div className="h-11 w-11 shrink-0 rounded-full border flex items-center justify-center"
+                    style={{ backgroundColor: `${config.color}14`, borderColor: `${config.color}28`, color: config.color }}>
                     <Icon className="h-5 w-5" />
                   </div>
-
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <h4 className="truncate text-[15px] font-bold text-white">{habit.name}</h4>
                       {isCompleted && (
-                        <span className="shrink-0 rounded border border-[#12B886]/20 bg-[#12B886]/10 px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase text-[#12B886]">
-                          Done
-                        </span>
+                        <span className="shrink-0 rounded border border-[#12B886]/20 bg-[#12B886]/10 px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase text-[#12B886]">Done</span>
                       )}
                     </div>
-
                     <div className="mt-1 flex items-center gap-1.5 text-[10px] font-semibold">
                       <span style={{ color: config.color }}>{habit.category}</span>
-                      <span className="text-gray-700">/</span>
-                      <span className="text-[#FCC419]">{habit.routineId ? 0 : habit.points} pts</span>
+                      <span className="text-gray-700">·</span>
+                      <span className="flex items-center text-[#FCC419] font-semibold shrink-0">
+                        <Zap className="w-2.5 h-2.5 mr-0.5 fill-[#FCC419]" />{habit.routineId ? 0 : habit.points} pts
+                      </span>
                     </div>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleCompleteHabit(habit)}
-                    disabled={isCompleted}
+                  <button type="button" onClick={() => {
+                    const current = habit.history[dateToday] || 0;
+                    const remaining = Math.max(0, habit.target - current);
+                    if (remaining > 0) onLogHabit(habit.id, remaining);
+                  }} disabled={isCompleted}
                     aria-label={isCompleted ? `${habit.name} complete` : `Complete ${habit.name}`}
-                    className={`h-10 w-10 shrink-0 rounded-full border-2 transition flex items-center justify-center active:scale-95 ${
-                      isCompleted
-                        ? 'border-[#12B886] bg-[#12B886] text-black'
-                        : 'border-[#30364A] bg-transparent hover:border-[#12B886] hover:bg-[#12B886]/10'
-                    }`}
-                  >
+                    className={`h-10 w-10 shrink-0 rounded-full border-2 transition flex items-center justify-center active:scale-95 ${isCompleted
+                      ? 'border-[#12B886] bg-[#12B886] text-black'
+                      : 'border-[#30364A] bg-transparent hover:border-[#12B886] hover:bg-[#12B886]/10'}`}>
                     {isCompleted && <Check className="h-4.5 w-4.5 stroke-[3px]" />}
                   </button>
                 </div>
-
                 <div className="mt-3 flex items-center gap-2">
                   <div className="h-1.5 flex-1 overflow-hidden rounded-full border border-[#242938] bg-[#0D0F17]">
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{ width: `${percentage}%`, backgroundColor: config.color, boxShadow: `0 0 6px ${config.color}` }}
-                    />
+                    <div className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${percentage}%`, backgroundColor: config.color, boxShadow: `0 0 6px ${config.color}` }} />
                   </div>
                   <span className="w-9 text-right text-[10px] font-mono text-gray-500">{percentage}%</span>
                 </div>
@@ -289,6 +412,8 @@ function QuickRoutineSheet({ routine, habits, onClose, onLogHabit }: QuickRoutin
   );
 }
 
+// ─── DASHBOARD PROPS ──────────────────────────────────────────────────────────
+
 interface DashboardProps {
   habits: Habit[];
   routines: Routine[];
@@ -300,20 +425,17 @@ interface DashboardProps {
   setSelectedCategoryId: (cat: Category | null) => void;
 }
 
+// ─── DASHBOARD ────────────────────────────────────────────────────────────────
+
 export default function Dashboard({
-  habits,
-  routines,
-  userPoints,
-  onLogHabit,
-  setTab,
-  onNavigateToRoutine,
-  selectedCategoryId,
-  setSelectedCategoryId,
+  habits, routines, userPoints, onLogHabit, setTab,
+  onNavigateToRoutine, selectedCategoryId, setSelectedCategoryId,
 }: DashboardProps) {
-  const { score: momentumScore, threeDayAvg, trajectory, yesterdayProgress, todayProgress } = calculateMomentum(habits);
-  
+  const { score: momentumScore, threeDayAvg, trajectory, yesterdayProgress, todayProgress } = calculateMomentum(habits, routines);
+  const standaloneHabitsAll = getStandaloneHabits(habits, routines);
+
   const getCategoryStats = (cat: Category) => {
-    const catHabits = habits.filter((h) => h.category === cat);
+    const catHabits = standaloneHabitsAll.filter((h) => h.category === cat);
     if (catHabits.length === 0) return 0;
     let completedRatioSum = 0;
     catHabits.forEach((h) => {
@@ -325,10 +447,10 @@ export default function Dashboard({
 
   const activeCategories = React.useMemo(() => {
     const cats = new Set<Category>();
-    habits.forEach((h) => cats.add(h.category));
+    standaloneHabitsAll.forEach((h) => cats.add(h.category));
     const order: Category[] = ['Fitness', 'Reading', 'Productivity', 'Health', 'Study', 'Mindfulness', 'Social', 'Custom'];
     return order.filter((c) => cats.has(c));
-  }, [habits]);
+  }, [standaloneHabitsAll]);
 
   const categoryProgressList = activeCategories.map((cat) => ({
     name: cat,
@@ -341,17 +463,14 @@ export default function Dashboard({
       ? Math.round(categoryProgressList.reduce((sum, c) => sum + c.progress, 0) / categoryProgressList.length)
       : 0;
 
-  const doneTodayCount = habits.filter((h) => (h.history[dateToday] || 0) >= h.target).length;
-  const totalTodayCount = habits.length;
-  const overallTodayProgress = totalTodayCount > 0 ? Math.round((doneTodayCount / totalTodayCount) * 100) : 0;
+  const { done: doneTodayCount, total: totalTodayCount, progressPercent: overallTodayProgress } = getDailyTaskCounts(habits, routines, dateToday);
 
   const totalPotentialPoints =
-    habits.reduce((acc, curr) => acc + (curr.routineId ? 0 : curr.points), 0) +
+    standaloneHabitsAll.reduce((acc, curr) => acc + curr.points, 0) +
     routines.reduce((acc, curr) => acc + curr.points, 0);
 
   const earnedPointsToday =
-    habits.reduce((acc, curr) => {
-      if (curr.routineId) return acc;
+    standaloneHabitsAll.reduce((acc, curr) => {
       const todayLog = curr.history[dateToday] || 0;
       const progressDonePercent = Math.min(1.0, todayLog / curr.target);
       return acc + Math.round(progressDonePercent * curr.points);
@@ -362,7 +481,7 @@ export default function Dashboard({
     }, 0);
 
   const [quickVals, setQuickVals] = useState<{ [key: string]: string }>({});
-  const [timeframeFilter, setTimeframeFilter] = useState<'All' | 'Morning' | 'Evening' | 'Night'>('All');
+  const [timeframeFilter, setTimeframeFilter] = useState<'All' | 'Morning' | 'Evening' | 'Night' | 'Anytime'>('All');
   const [selectedRoutineSheetId, setSelectedRoutineSheetId] = useState<string | null>(null);
 
   const journeyStartDate = localStorage.getItem('habit_mountain_journey_start_date');
@@ -376,7 +495,6 @@ export default function Dashboard({
     const timelineDates: string[] = [];
     const start = new Date(journeyStartDate);
     const end = new Date(dateToday);
-
     if (!isNaN(start.getTime()) && !isNaN(end.getTime())) {
       const current = new Date(start);
       while (current <= end) {
@@ -387,19 +505,11 @@ export default function Dashboard({
         current.setDate(current.getDate() + 1);
       }
     }
-
     let runningGrowth = 0.0;
     let greatStreak = 0;
-
     timelineDates.forEach((dateStr) => {
-      const completedToday = habits.filter(h => {
-        const progressVal = h.history[dateStr] || 0;
-        return progressVal >= h.target;
-      }).length;
-
-      const totalToday = habits.length;
-      let pScore = totalToday > 0 ? (completedToday / totalToday) : 1.0;
-
+      const dayCounts = getDailyTaskCounts(habits, routines, dateStr);
+      let pScore = dayCounts.total > 0 ? (dayCounts.done / dayCounts.total) : 1.0;
       if (journeyStartDate === '2026-05-23') {
         if (dateStr === '2026-05-23') pScore = 0.45;
         else if (dateStr === '2026-05-24') pScore = 0.15;
@@ -408,42 +518,31 @@ export default function Dashboard({
         else if (dateStr === '2026-05-27') pScore = 1.00;
         else if (dateStr === '2026-05-28') pScore = 0.40;
         else if (dateStr === dateToday) {
-          const completedLive = habits.filter(h => (h.history[dateStr] || 0) >= h.target).length;
-          pScore = totalToday > 0 ? (completedLive / totalToday) : 1.0;
+          const liveCounts = getDailyTaskCounts(habits, routines, dateStr);
+          pScore = liveCounts.total > 0 ? (liveCounts.done / liveCounts.total) : 1.0;
         }
       }
-
       let growthEarned = 0.0;
       if (pScore >= 0.8) {
         greatStreak += 1;
-        if (greatStreak <= 2) {
-          growthEarned = 1.0;
-        } else if (greatStreak <= 4) {
-          growthEarned = 1.2;
-        } else {
-          growthEarned = 1.5;
-        }
+        growthEarned = greatStreak <= 2 ? 1.0 : greatStreak <= 4 ? 1.2 : 1.5;
       } else if (pScore >= 0.4) {
         growthEarned = 0.2;
       } else {
         greatStreak = 0;
         growthEarned = -0.5;
       }
-
       let floor = 0;
       if (runningGrowth >= 301) floor = 301;
       else if (runningGrowth >= 201) floor = 201;
       else if (runningGrowth >= 121) floor = 121;
       else if (runningGrowth >= 51) floor = 51;
-
       const rawNewGrowth = runningGrowth + growthEarned;
       runningGrowth = Math.max(floor, rawNewGrowth);
       runningGrowth = Math.round(runningGrowth * 100) / 100;
     });
-
     activeGrowthValue = runningGrowth;
     betterStreak = greatStreak;
-
     if (activeGrowthValue <= 50) currentBetterLevelName = 'The Inertia Breaker';
     else if (activeGrowthValue <= 120) currentBetterLevelName = 'The Rhythm Builder';
     else if (activeGrowthValue <= 200) currentBetterLevelName = 'The Flow State';
@@ -452,10 +551,7 @@ export default function Dashboard({
   }
 
   const handleQuickLog = (habitId: string, customVal?: number) => {
-    if (customVal !== undefined) {
-      onLogHabit(habitId, customVal);
-      return;
-    }
+    if (customVal !== undefined) { onLogHabit(habitId, customVal); return; }
     const entered = Number(quickVals[habitId] || 1);
     onLogHabit(habitId, entered);
     setQuickVals((prev) => ({ ...prev, [habitId]: '' }));
@@ -476,13 +572,12 @@ export default function Dashboard({
 
   return (
     <div className="space-y-5 md:space-y-8 max-w-5xl mx-auto">
-      {/* 1a. Mobile-only compact header */}
+
+      {/* ── MOBILE HEADER ── */}
       <header className="md:hidden flex items-center justify-between py-2 border-b border-[#1A1D24]">
         <div className="flex items-center gap-2.5">
           <Sparkles className="w-4.5 h-4.5 text-[#FCC419] animate-spin-slow shrink-0" />
-          <h1 className="text-lg font-extrabold tracking-tight text-white font-sans">
-            Habits
-          </h1>
+          <h1 className="text-lg font-extrabold tracking-tight text-white font-sans">Habits</h1>
           <span className="text-xs font-mono text-gray-500">
             {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
           </span>
@@ -492,57 +587,44 @@ export default function Dashboard({
             <div className="relative w-5 h-5 shrink-0">
               <svg className="absolute w-full h-full -rotate-90" viewBox="0 0 20 20">
                 <circle cx="10" cy="10" r="8" className="stroke-gray-800" strokeWidth="2.5" fill="transparent" />
-                <circle
-                  cx="10" cy="10" r="8"
-                  stroke="#12B886" strokeWidth="2.5" fill="transparent"
+                <circle cx="10" cy="10" r="8" stroke="#12B886" strokeWidth="2.5" fill="transparent"
                   strokeDasharray={2 * Math.PI * 8}
                   strokeDashoffset={2 * Math.PI * 8 * (1 - overallTodayProgress / 100)}
-                  style={{ filter: 'drop-shadow(0 0 3px rgba(18,184,134,0.6))' }}
-                />
+                  style={{ filter: 'drop-shadow(0 0 3px rgba(18,184,134,0.6))' }} />
               </svg>
             </div>
             <span className="text-sm font-mono font-bold text-[#12B886]">{overallTodayProgress}%</span>
             <span className="text-xs text-gray-400 font-semibold">{doneTodayCount}/{totalTodayCount}</span>
           </div>
-          <button
-            onClick={() => setTab('habits')}
-            className="flex items-center gap-1.5 bg-[#12141C] border border-[#272B36] rounded-lg px-3 py-2 text-xs font-semibold text-gray-300 hover:text-white transition cursor-pointer"
-          >
+          <button onClick={() => setTab('habits')}
+            className="flex items-center gap-1.5 bg-[#12141C] border border-[#272B36] rounded-lg px-3 py-2 text-xs font-semibold text-gray-300 hover:text-white transition cursor-pointer">
             <span>Habits</span>
             <ArrowUpRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </header>
 
-      {/* 1b. Desktop-only full header */}
+      {/* ── DESKTOP HEADER ── */}
       <header className="hidden md:flex flex-row items-center justify-between pb-6 border-b border-[#1A1D24] gap-6">
         <div>
           <span className="font-mono text-xs text-[#12B886] uppercase tracking-widest font-semibold flex items-center">
             <Sparkles className="w-3.5 h-3.5 mr-1 text-[#FCC419] animate-spin-slow" />
             Productivity Identity System
           </span>
-          <h1 className="text-5xl font-extrabold tracking-tighter text-white font-sans mt-1">
-            Habits
-          </h1>
-          <p className="text-sm text-gray-400 font-sans mt-1 text-left">
-            Build momentum, one rep at a time.
-          </p>
+          <h1 className="text-5xl font-extrabold tracking-tighter text-white font-sans mt-1">Habits</h1>
+          <p className="text-sm text-gray-400 font-sans mt-1 text-left">Build momentum, one rep at a time.</p>
         </div>
-
         <div className="flex items-center space-x-6">
           <div className="flex bg-[#14161F]/95 border border-[#232734] rounded-2xl p-4 items-center space-x-4 max-w-xs shadow-md relative overflow-hidden group/header-gauge hover:border-[#12B886]/30 hover:shadow-[0_0_20px_rgba(18,184,134,0.12)] transition-all duration-350">
             <div className="absolute inset-0 bg-gradient-to-tr from-[#12B886]/5 to-transparent opacity-0 group-hover/header-gauge:opacity-100 transition-opacity duration-350 pointer-events-none" />
             <div className="relative w-14 h-14 flex items-center justify-center shrink-0">
               <svg className="absolute w-full h-full transform -rotate-90">
                 <circle cx="28" cy="28" r="23" className="stroke-gray-800" strokeWidth="3.5" fill="transparent" />
-                <circle
-                  cx="28" cy="28" r="23"
-                  className="stroke-[#12B886] transition-all duration-500"
+                <circle cx="28" cy="28" r="23" className="stroke-[#12B886] transition-all duration-500"
                   strokeWidth="3.5" fill="transparent"
                   strokeDasharray={2 * Math.PI * 23}
                   strokeDashoffset={2 * Math.PI * 23 * (1 - overallTodayProgress / 100)}
-                  style={{ filter: 'drop-shadow(0 0 4px rgba(18, 184, 134, 0.5))' }}
-                />
+                  style={{ filter: 'drop-shadow(0 0 4px rgba(18, 184, 134, 0.5))' }} />
               </svg>
               <div className="text-xs font-mono font-bold text-white pr-0.5 relative z-10">{overallTodayProgress}%</div>
             </div>
@@ -554,70 +636,50 @@ export default function Dashboard({
               </p>
             </div>
           </div>
-          <button
-            onClick={() => setTab('habits')}
-            className="flex items-center space-x-1 border border-[#272B36] bg-[#12141C] hover:bg-[#1E212E] hover:text-white px-4 py-2.5 rounded-xl text-xs font-semibold text-gray-300 cursor-pointer transition-all hover:shadow-[0_0_15px_rgba(255,255,255,0.05)] select-none"
-          >
+          <button onClick={() => setTab('habits')}
+            className="flex items-center space-x-1 border border-[#272B36] bg-[#12141C] hover:bg-[#1E212E] hover:text-white px-4 py-2.5 rounded-xl text-xs font-semibold text-gray-300 cursor-pointer transition-all hover:shadow-[0_0_15px_rgba(255,255,255,0.05)] select-none">
             <span>My Habits</span>
             <ArrowUpRight className="w-3.5 h-3.5" />
           </button>
         </div>
       </header>
 
-      {/* Active category pills — hidden on mobile to save vertical space */}
+      {/* ── DESKTOP CATEGORY PILLS ── */}
       {activeCategories.length > 0 && (
         <div className="hidden md:flex flex-wrap items-center gap-2 md:gap-3">
           {activeCategories.map((cat) => {
             const val = getCategoryStats(cat);
             const color = getCategoryColor(cat);
             return (
-              <div
-                key={cat}
+              <div key={cat}
                 className="flex items-center space-x-2 bg-[#12141C] border border-[#232734] px-3 md:px-4 py-2 rounded-full text-xs text-gray-300 cursor-pointer hover:bg-[#1E212E] transition-all duration-300"
                 style={{ boxShadow: 'none' }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.borderColor = `${color}66`;
-                  e.currentTarget.style.boxShadow = `0 0 12px ${color}33`;
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.borderColor = '#232734';
-                  e.currentTarget.style.boxShadow = 'none';
-                }}
-                onClick={() => setSelectedCategoryId(cat)}
-              >
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${color}66`; e.currentTarget.style.boxShadow = `0 0 12px ${color}33`; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor = '#232734'; e.currentTarget.style.boxShadow = 'none'; }}
+                onClick={() => setSelectedCategoryId(cat)}>
                 <span className="w-2.5 h-2.5 rounded-full animate-pulse" style={{ backgroundColor: color }} />
                 <span className="font-semibold text-gray-250">{cat}</span>
-                <span className="text-[10px] font-mono text-gray-400 font-bold bg-[#1A1D28] rounded px-1.5 py-0.5">
-                  {val}%
-                </span>
+                <span className="text-[10px] font-mono text-gray-400 font-bold bg-[#1A1D28] rounded px-1.5 py-0.5">{val}%</span>
               </div>
             );
           })}
         </div>
       )}
 
-      {/* 2. Primary Metrics: Progress, Points, Momentum, and Compounding Index */}
+      {/* ── STATS GRID ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5 md:gap-6">
-        
-        {/* Card 1: PROGRESS TODAY */}
+
+        {/* Progress Today */}
         <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-3.5 md:p-2.5 flex flex-col justify-between h-28 sm:h-22 relative overflow-hidden group hover:border-[#12B886]/40 hover:shadow-[0_0_25px_rgba(18,184,134,0.12)] transition-all duration-300">
           <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-br from-[#12B886]/5 to-transparent rounded-full blur-2xl pointer-events-none" />
           <div className="relative z-10 text-left">
-            <div className="flex items-center text-[11px] md:text-[9px] font-mono text-gray-500 tracking-wider select-none">
-              PROGRESS TODAY
-              <span className="text-[9px] ml-1 text-gray-400 cursor-pointer hidden sm:inline">ⓘ</span>
-            </div>
-            <div className="mt-1 text-2xl sm:text-xl font-extrabold text-[#12B886] font-sans tracking-tight">
-              {overallTodayProgress}%
-            </div>
+            <div className="flex items-center text-[11px] md:text-[9px] font-mono text-gray-500 tracking-wider select-none">PROGRESS TODAY</div>
+            <div className="mt-1 text-2xl sm:text-xl font-extrabold text-[#12B886] font-sans tracking-tight">{overallTodayProgress}%</div>
           </div>
-
           <div className="relative z-10 text-left">
             <div className="w-full h-1.5 md:h-1 bg-[#171924] rounded-full overflow-hidden mt-2">
-              <div
-                className="h-full bg-[#12B886] transition-all duration-500 rounded-full"
-                style={{ width: `${overallTodayProgress}%`, boxShadow: '0 0 6px #12B886dd' }}
-              />
+              <div className="h-full bg-[#12B886] transition-all duration-500 rounded-full"
+                style={{ width: `${overallTodayProgress}%`, boxShadow: '0 0 6px #12B886dd' }} />
             </div>
             <div className="flex items-center justify-between text-xs md:text-[10px] font-semibold text-gray-400 mt-1.5 select-none">
               <span>{doneTodayCount}/{totalTodayCount} done</span>
@@ -625,25 +687,19 @@ export default function Dashboard({
           </div>
         </div>
 
-        {/* Card 2: POINTS TODAY */}
+        {/* Points Today */}
         <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-3.5 md:p-2.5 flex flex-col justify-between h-28 sm:h-22 relative overflow-hidden group hover:border-[#12B886]/40 hover:shadow-[0_0_25px_rgba(18,184,134,0.12)] transition-all duration-300">
           <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-br from-[#12B886]/5 to-transparent rounded-full blur-2xl pointer-events-none" />
           <div className="relative z-10 text-left">
-            <div className="flex items-center text-[11px] md:text-[9px] font-mono text-gray-500 tracking-wider select-none">
-              POINTS TODAY
-              <span className="text-[9px] ml-1 text-gray-400 cursor-pointer hidden sm:inline">ⓘ</span>
-            </div>
+            <div className="text-[11px] md:text-[9px] font-mono text-gray-500 tracking-wider select-none">POINTS TODAY</div>
             <div className="mt-1 text-xl sm:text-lg font-extrabold text-white font-sans tracking-tight truncate">
-              {earnedPointsToday} <span className="text-gray-650 font-light text-sm">/</span> <span className="text-gray-400 font-medium text-sm sm:text-sm">{totalPotentialPoints}</span>
+              {earnedPointsToday} <span className="text-gray-650 font-light text-sm">/</span> <span className="text-gray-400 font-medium text-sm">{totalPotentialPoints}</span>
             </div>
           </div>
-
           <div className="relative z-10 text-left">
             <div className="w-full h-1.5 md:h-1 bg-[#171924] rounded-full overflow-hidden mt-2">
-              <div
-                className="h-full bg-gradient-to-r from-[#12B886] to-[#A9E34B] transition-all duration-500 rounded-full"
-                style={{ width: `${totalPotentialPoints > 0 ? (earnedPointsToday / totalPotentialPoints) * 100 : 0}%`, boxShadow: '0 0 6px #12B886dd' }}
-              />
+              <div className="h-full bg-gradient-to-r from-[#12B886] to-[#A9E34B] transition-all duration-500 rounded-full"
+                style={{ width: `${totalPotentialPoints > 0 ? (earnedPointsToday / totalPotentialPoints) * 100 : 0}%`, boxShadow: '0 0 6px #12B886dd' }} />
             </div>
             <div className="flex items-center justify-between text-xs md:text-[10px] font-semibold text-gray-400 mt-1.5 select-none">
               <span>{totalPotentialPoints - earnedPointsToday} left</span>
@@ -654,73 +710,47 @@ export default function Dashboard({
           </div>
         </div>
 
-        {/* Card 3: MOMENTUM */}
+        {/* Momentum */}
         <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-3.5 md:p-2.5 flex flex-col justify-between h-28 sm:h-22 relative overflow-hidden group hover:border-red-500/30 hover:shadow-[0_0_25px_rgba(250,82,82,0.12)] transition-all duration-300">
           <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-br from-[#FA5252]/5 to-transparent rounded-full blur-2xl pointer-events-none" />
           <div className="relative z-10 text-left">
-            <div className="flex items-center justify-between text-[11px] md:text-[9px] font-mono text-gray-500 tracking-wider select-none">
-              <span>MOMENTUM</span>
-              <span className="text-[9px] text-gray-400 hidden sm:inline">ⓘ</span>
-            </div>
+            <div className="text-[11px] md:text-[9px] font-mono text-gray-500 tracking-wider select-none">MOMENTUM</div>
             <div className="mt-1 text-sm sm:text-sm font-extrabold text-[#FA5252] font-sans tracking-tight truncate filter drop-shadow-[0_0_6px_rgba(250,82,82,0.2)]">
               {momentumScore >= 90 ? 'Ultra Focus' : momentumScore >= 75 ? 'Flow State' : momentumScore >= 45 ? 'Ignition' : 'Inertia'}
             </div>
           </div>
-
           <div className="flex items-center justify-between select-none relative z-10 mt-2">
-            <span className="text-sm md:text-[10px] font-mono font-bold text-gray-300">
-              {momentumScore}%
-            </span>
+            <span className="text-sm md:text-[10px] font-mono font-bold text-gray-300">{momentumScore}%</span>
             <svg className="w-16 sm:w-16 h-5 overflow-visible shrink-0" viewBox="0 0 100 40">
-              <path
-                d="M 0 32 Q 25 18, 50 25 T 85 14 T 100 4"
-                fill="none"
-                stroke={momentumScore >= 45 ? '#12B886' : '#FCC419'}
-                strokeWidth="4"
-                strokeLinecap="round"
-                style={{ filter: `drop-shadow(0 0 4px ${momentumScore >= 45 ? 'rgba(18,184,134,0.5)' : 'rgba(252,196,25,0.5)'})` }}
-                className="transition-all duration-300"
-              />
-              <circle
-                cx="100"
-                cy="4"
-                r="5"
-                fill={momentumScore >= 45 ? '#12B886' : '#FCC419'}
-                className="animate-pulse"
-              />
+              <path d="M 0 32 Q 25 18, 50 25 T 85 14 T 100 4" fill="none"
+                stroke={momentumScore >= 45 ? '#12B886' : '#FCC419'} strokeWidth="4" strokeLinecap="round"
+                style={{ filter: `drop-shadow(0 0 4px ${momentumScore >= 45 ? 'rgba(18,184,134,0.5)' : 'rgba(252,196,25,0.5)'})` }} />
+              <circle cx="100" cy="4" r="5" fill={momentumScore >= 45 ? '#12B886' : '#FCC419'} className="animate-pulse" />
             </svg>
           </div>
         </div>
 
-        {/* Card 4: 1% BETTER COMP_INDEX */}
+        {/* Comp Index */}
         <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-3.5 md:p-2.5 flex flex-col justify-between h-28 sm:h-22 relative overflow-hidden group hover:border-[#FCC419]/40 hover:shadow-[0_0_25px_rgba(252,196,25,0.12)] transition-all duration-300">
           <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-br from-[#FCC419]/5 to-transparent rounded-full blur-2xl pointer-events-none" />
           <div className="relative z-10 text-left">
-            <div className="flex items-center justify-between text-[11px] md:text-[9px] font-mono text-gray-500 tracking-wider select-none">
-              <span>COMP INDEX</span>
-              <span className="text-[9px] text-gray-400 hidden sm:inline">ⓘ</span>
-            </div>
+            <div className="text-[11px] md:text-[9px] font-mono text-gray-500 tracking-wider select-none">COMP INDEX</div>
             <div className="mt-1 text-xl sm:text-lg font-extrabold text-[#FCC419] font-sans tracking-tight filter drop-shadow-[0_0_6px_rgba(252,196,25,0.2)]">
               +{activeGrowthValue.toFixed(1)}%
             </div>
           </div>
-
           <div className="flex items-end justify-between select-none relative z-10 mt-2 text-left">
             <div className="flex flex-col w-full">
               <div className="w-full h-1.5 md:h-1 bg-[#171924] rounded-full overflow-hidden mb-1">
-                <div
-                  className="h-full bg-[#FCC419] transition-all duration-500 rounded-full"
-                  style={{ width: `${Math.min(100, (activeGrowthValue / 30) * 100)}%`, boxShadow: '0 0 6px #FCC419dd' }}
-                />
+                <div className="h-full bg-[#FCC419] transition-all duration-500 rounded-full"
+                  style={{ width: `${Math.min(100, (activeGrowthValue / 30) * 100)}%`, boxShadow: '0 0 6px #FCC419dd' }} />
               </div>
               <span className="text-[11px] md:text-[9px] font-bold text-gray-400 truncate">
                 Streak: <span className="text-[#FCC419] font-mono">{betterStreak}d</span>
               </span>
             </div>
-            <button 
-              onClick={() => setTab('1%better')}
-              className="text-[10px] md:text-[8px] font-mono font-bold bg-[#12141C] border border-[#232734] text-gray-300 px-2 py-1 md:px-1.5 md:py-0.5 rounded ml-1.5 cursor-pointer hover:bg-gray-800 hover:text-[#FCC419] hover:border-[#FCC419]/40 transition duration-350 shadow-sm"
-            >
+            <button onClick={() => setTab('1%better')}
+              className="text-[10px] md:text-[8px] font-mono font-bold bg-[#12141C] border border-[#232734] text-gray-300 px-2 py-1 md:px-1.5 md:py-0.5 rounded ml-1.5 cursor-pointer hover:bg-gray-800 hover:text-[#FCC419] hover:border-[#FCC419]/40 transition duration-350 shadow-sm">
               MAP
             </button>
           </div>
@@ -728,11 +758,19 @@ export default function Dashboard({
 
       </div>
 
-      {/* 3. Quick Habit Logger with points rewarding system */}
+      {/* ── CATEGORY RINGS ── */}
+      {activeCategories.length > 0 && (
+        <CategoryRingsCard
+          categories={activeCategories}
+          getCategoryStats={getCategoryStats}
+          overallAvg={overallCategoryAvg}
+          onSelectCategory={setSelectedCategoryId}
+        />
+      )}
+
+      {/* ── QUICK HABIT LOGGER ── */}
       <div id="quick-habit-logger-section" className="bg-[#14161F]/90 border border-[#232734]/80 p-4 md:p-6 rounded-2xl shadow-lg relative overflow-hidden group/logger duration-300 transition-all hover:border-[#12B886]/20 hover:shadow-[0_0_35px_rgba(18,184,134,0.03)]">
-        {/* Dynamic backdrop glows */}
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-gradient-to-r from-purple-500/5 to-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
-        {/* Header: single compact row */}
         <div className="flex items-center justify-between mb-4 md:mb-3 relative z-10">
           <h3 className="text-base md:text-sm font-bold text-white font-sans flex items-center">
             <CheckCircle2 className="w-5 h-5 md:w-4 md:h-4 text-[#12B886] mr-2 md:mr-1.5 animate-pulse" />
@@ -744,20 +782,25 @@ export default function Dashboard({
         </div>
 
         {(() => {
-          // All habits filtered by timeframe
-          const allHabits = habits;
+          const allHabits = standaloneHabitsAll;
           const habitMatchesTimeframe = (h: Habit) =>
             timeframeFilter === 'All' || getHabitTimeframe(h, routines) === timeframeFilter;
 
-          // Counts for filter tabs (across all habits)
-          const allCount = allHabits.length;
-          const morningCount = allHabits.filter(h => getHabitTimeframe(h, routines) === 'Morning').length;
-          const eveningCount = allHabits.filter(h => getHabitTimeframe(h, routines) === 'Evening').length;
-          const nightCount = allHabits.filter(h => getHabitTimeframe(h, routines) === 'Night').length;
+          const allCount = standaloneHabitsAll.length + routines.length;
+          const morningCount =
+            standaloneHabitsAll.filter(h => getHabitTimeframe(h, routines) === 'Morning').length +
+            routines.filter(rt => rt.timeBlock === 'Morning').length;
+          const eveningCount =
+            standaloneHabitsAll.filter(h => getHabitTimeframe(h, routines) === 'Evening').length +
+            routines.filter(rt => rt.timeBlock === 'Evening').length;
+          const nightCount =
+            standaloneHabitsAll.filter(h => getHabitTimeframe(h, routines) === 'Night').length +
+            routines.filter(rt => rt.timeBlock === 'Night').length;
+          const anytimeCount =
+            standaloneHabitsAll.filter(h => getHabitTimeframe(h, routines) === 'Anytime').length +
+            routines.filter(rt => rt.timeBlock === 'Constant').length;
 
-          // Standalone habits (not in any routine), filtered by timeframe
-          const routineHabitIds = new Set(routines.flatMap(rt => rt.habitIds));
-          const standaloneHabits = allHabits.filter(h => !routineHabitIds.has(h.id) && !h.routineId && habitMatchesTimeframe(h));
+          const standaloneHabits = allHabits.filter(h => habitMatchesTimeframe(h));
           const selectedRoutine = routines.find(rt => rt.id === selectedRoutineSheetId) || null;
           const selectedRoutineHabits = selectedRoutine
             ? habits.filter(h => selectedRoutine.habitIds.includes(h.id) && habitMatchesTimeframe(h))
@@ -773,17 +816,14 @@ export default function Dashboard({
             return (
               <div
                 style={{ '--hover-glow': `${config.color}15`, '--card-border': `${config.color}35` } as React.CSSProperties}
-                className="relative bg-[#12141C]/90 hover:bg-[#151722] border border-[#232734]/50 hover:border-[var(--card-border)] rounded-[16px] transition-all duration-300 flex items-center pl-6 pr-3.5 py-3.5 md:py-2.5 gap-3 md:gap-2.5 overflow-hidden group shadow-sm hover:shadow-[0_0_20px_var(--hover-glow)]"
-              >
+                className="relative bg-[#12141C]/90 hover:bg-[#151722] border border-[#232734]/50 hover:border-[var(--card-border)] rounded-[16px] transition-all duration-300 flex items-center pl-6 pr-3.5 py-3.5 md:py-2.5 gap-3 md:gap-2.5 overflow-hidden group shadow-sm hover:shadow-[0_0_20px_var(--hover-glow)]">
                 <div className="absolute inset-0 pointer-events-none opacity-50 group-hover:opacity-100 transition-opacity duration-300"
                   style={{ background: `radial-gradient(ellipse 180px 80px at 0% 50%, ${config.color}12, transparent)` }} />
                 <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-[16px]" style={{ backgroundColor: config.color }} />
-                {/* Icon */}
                 <div className="h-10 w-10 md:h-8 md:w-8 rounded-full flex items-center justify-center shrink-0 border relative z-10 group-hover:scale-105 transition-transform duration-300"
                   style={{ backgroundColor: `${config.color}15`, borderColor: `${config.color}25`, color: config.color }}>
                   <IconComp className="w-4.5 h-4.5 md:w-3.5 md:h-3.5" />
                 </div>
-                {/* Name + meta */}
                 <div className="flex flex-col min-w-0 shrink-0 w-[95px] xs:w-[115px] md:w-[105px] relative z-10 text-left">
                   <h4 className="text-[15px] md:text-[13px] font-bold text-white font-sans tracking-tight truncate">{item.name}</h4>
                   <div className="flex items-center gap-1.5 md:gap-1 text-[11px] md:text-[9px] text-gray-500 mt-0.5">
@@ -794,7 +834,6 @@ export default function Dashboard({
                     </span>
                   </div>
                 </div>
-                {/* Progress bar */}
                 <div className="flex-1 min-w-0 relative z-10">
                   <div className="flex justify-between items-center text-[11px] md:text-[9px] font-bold mb-1">
                     <span style={{ color: config.color }}>{progressVal}/{item.target} <span className="text-gray-600 font-normal">{item.unit}</span></span>
@@ -805,7 +844,6 @@ export default function Dashboard({
                       style={{ width: `${percentage}%`, backgroundColor: config.color, boxShadow: `0 0 6px ${config.color}` }} />
                   </div>
                 </div>
-                {/* Circle complete */}
                 <div className="shrink-0 relative z-10">
                   {isCompleted ? (
                     <div className="h-10 w-10 md:h-8 md:w-8 rounded-full flex items-center justify-center bg-[#12B886] animate-pulse text-black"
@@ -826,21 +864,28 @@ export default function Dashboard({
             );
           };
 
+          const routineMatchesTimeframe = (rt: typeof routines[0]) => {
+            if (timeframeFilter === 'All') return true;
+            if (timeframeFilter === 'Anytime') return rt.timeBlock === 'Constant';
+            return rt.timeBlock === timeframeFilter;
+          };
+
           const totalVisible =
-            routines.reduce((acc, rt) => {
-              const filtered = habits.filter(h => rt.habitIds.includes(h.id) && habitMatchesTimeframe(h));
-              return acc + filtered.length;
+            routines.filter(routineMatchesTimeframe).reduce((acc, rt) => {
+              const filtered = habits.filter(h => rt.habitIds.includes(h.id));
+              return acc + (filtered.length > 0 ? 1 : 0);
             }, 0) + standaloneHabits.length;
 
           return (
             <div className="space-y-3">
-              {/* ── Filter Tabs ── */}
+              {/* Filter Tabs */}
               <div className="flex items-center gap-2 md:gap-1.5 border-b border-gray-800/60 pb-3.5 md:pb-3 overflow-x-auto scrollbar-none">
                 {[
                   { value: 'All', label: 'All', count: allCount, icon: '', activeColor: 'bg-[#12B886]/10 text-[#12B886] border-[#12B886]/20' },
                   { value: 'Morning', label: 'Morning', count: morningCount, icon: '☀️', activeColor: 'bg-[#FCC419]/10 text-[#FCC419] border-[#FCC419]/30' },
                   { value: 'Evening', label: 'Evening', count: eveningCount, icon: '🌆', activeColor: 'bg-[#FD7E14]/10 text-[#FD7E14] border-[#FD7E14]/30' },
                   { value: 'Night', label: 'Night', count: nightCount, icon: '🌙', activeColor: 'bg-[#845EF7]/10 text-[#845EF7] border-[#845EF7]/30' },
+                  { value: 'Anytime', label: 'Anytime', count: anytimeCount, icon: '🔄', activeColor: 'bg-[#20C997]/10 text-[#20C997] border-[#20C997]/30' },
                 ].map(tab => {
                   const isActive = timeframeFilter === tab.value;
                   return (
@@ -856,7 +901,7 @@ export default function Dashboard({
                 })}
               </div>
 
-              {/* ── Grouped Habit List ── */}
+              {/* Habit List */}
               {totalVisible === 0 ? (
                 <div className="bg-[#12141C]/50 border border-dashed border-gray-800 rounded-xl py-10 text-center">
                   <CheckCircle2 className="w-7 h-7 text-[#12B886] mx-auto mb-2 animate-pulse" />
@@ -865,32 +910,25 @@ export default function Dashboard({
                 </div>
               ) : (
                 <div className="space-y-3.5 md:space-y-3">
-                  {/* Routine sections */}
-                  {routines.map(rt => {
-                    const rtHabits = habits.filter(h => rt.habitIds.includes(h.id) && habitMatchesTimeframe(h));
+                  {/* Routines */}
+                  {routines.filter(routineMatchesTimeframe).map(rt => {
+                    const rtHabits = habits.filter(h => rt.habitIds.includes(h.id));
                     if (rtHabits.length === 0) return null;
-
                     const doneCount = rtHabits.filter(h => (h.history[dateToday] || 0) >= h.target).length;
                     const totalCount = rtHabits.length;
                     const rtProgress = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
                     const allDone = totalCount > 0 && doneCount === totalCount;
-
                     return (
-                      <button
-                        key={rt.id}
-                        type="button"
-                        onClick={() => setSelectedRoutineSheetId(rt.id)}
+                      <button key={rt.id} type="button" onClick={() => setSelectedRoutineSheetId(rt.id)}
                         aria-label={`Open ${rt.name} routine`}
                         className={`w-full rounded-xl border text-left overflow-hidden bg-[#0F1018] hover:bg-[#151826] transition-all duration-200 cursor-pointer select-none shadow-sm active:scale-[0.99] ${
                           allDone ? 'border-[#12B886]/25' : 'border-[#845EF7]/20 hover:border-[#845EF7]/40'
-                        }`}
-                      >
+                        }`}>
                         <div className="flex items-center gap-3 md:gap-2.5 px-3.5 md:px-3 py-3 md:py-2.5">
                           <div className="w-1 h-8 md:h-7 rounded-full bg-[#845EF7] shrink-0" />
                           <div className="h-10 w-10 md:h-8 md:w-8 rounded-full border border-[#845EF7]/20 bg-[#845EF7]/10 text-[#B197FC] flex items-center justify-center shrink-0">
                             <Navigation className="w-4.5 h-4.5 md:w-3.5 md:h-3.5" />
                           </div>
-
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 md:gap-1.5">
                               <span className="text-[14px] md:text-[12px] font-bold text-white truncate">{rt.name}</span>
@@ -905,18 +943,14 @@ export default function Dashboard({
                                 </span>
                               )}
                             </div>
-
                             <div className="flex items-center gap-2 md:gap-1.5 mt-1.5 md:mt-1">
                               <div className="flex-1 h-1.5 md:h-1 bg-gray-800 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full rounded-full bg-gradient-to-r from-purple-500 to-indigo-400 transition-all duration-500"
-                                  style={{ width: `${rtProgress}%`, boxShadow: '0 0 4px #845EF7' }}
-                                />
+                                <div className="h-full rounded-full bg-gradient-to-r from-purple-500 to-indigo-400 transition-all duration-500"
+                                  style={{ width: `${rtProgress}%`, boxShadow: '0 0 4px #845EF7' }} />
                               </div>
                               <span className="text-[11px] md:text-[9px] font-mono text-purple-400 shrink-0">{doneCount}/{totalCount}</span>
                             </div>
                           </div>
-
                           <div className="flex items-center gap-2 md:gap-1.5 shrink-0">
                             <span className="text-[11px] md:text-[9px] font-mono font-bold text-[#FCC419] bg-[#FCC419]/10 border border-[#FCC419]/20 px-2 py-1 md:px-1.5 md:py-0.5 rounded">
                               +{rt.points}XP
@@ -928,7 +962,7 @@ export default function Dashboard({
                     );
                   })}
 
-                  {/* Standalone habits (no routine) */}
+                  {/* Standalone habits */}
                   {standaloneHabits.length > 0 && (
                     <div className="space-y-2 md:space-y-1.5">
                       {routines.length > 0 && (
@@ -957,43 +991,34 @@ export default function Dashboard({
         })()}
       </div>
 
-      {/* 4. Secondary Features: Category Progress and Active Routines */}
+      {/* ── BOTTOM GRID: Category Progress + Active Routines ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
+
         {/* Category Progress Widget */}
         <div className="bg-[#14161F]/90 border border-[#232734]/80 rounded-2xl p-6 flex flex-col justify-between min-h-[300px]">
           <div>
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-mono tracking-wider text-gray-500">CATEGORIES BREAKDOWN</span>
-              <span className="text-lg font-bold text-white font-mono">
-                {overallCategoryAvg}%
-              </span>
+              <span className="text-lg font-bold text-white font-mono">{overallCategoryAvg}%</span>
             </div>
             <h3 className="text-base font-bold text-white mt-1 text-left">Category Progress</h3>
             <p className="text-[10px] text-gray-500 mt-0.5">
               {activeCategories.length} active {activeCategories.length === 1 ? 'category' : 'categories'}
             </p>
           </div>
-
           <div className="my-6">
             {categoryProgressList.length > 0 ? (
               <div className={`grid gap-3 md:gap-4 ${
-                categoryProgressList.length <= 3
-                  ? 'grid-cols-3'
-                  : categoryProgressList.length <= 4
-                    ? 'grid-cols-2 sm:grid-cols-4'
-                    : 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
+                categoryProgressList.length <= 3 ? 'grid-cols-3' :
+                categoryProgressList.length <= 4 ? 'grid-cols-2 sm:grid-cols-4' :
+                'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
               }`}>
                 {categoryProgressList.map((item) => (
                   <div key={item.name} className="flex flex-col items-center">
-                    <div
-                      onClick={() => setSelectedCategoryId(item.name)}
-                      className="w-full h-20 md:h-24 bg-gray-900 rounded-lg relative overflow-hidden flex items-end cursor-pointer hover:bg-[#1A1C27] border border-gray-800 transition"
-                    >
-                      <div
-                        className="w-full rounded-t transition-all duration-500"
-                        style={{ height: `${item.progress}%`, backgroundColor: item.color }}
-                      />
+                    <div onClick={() => setSelectedCategoryId(item.name)}
+                      className="w-full h-20 md:h-24 bg-gray-900 rounded-lg relative overflow-hidden flex items-end cursor-pointer hover:bg-[#1A1C27] border border-gray-800 transition">
+                      <div className="w-full rounded-t transition-all duration-500"
+                        style={{ height: `${item.progress}%`, backgroundColor: item.color }} />
                     </div>
                     <span className="text-xs font-semibold text-gray-300 mt-2 text-center">{item.name}</span>
                     <span className="text-[10px] font-mono text-gray-500 mt-0.5">{item.progress}%</span>
@@ -1001,12 +1026,9 @@ export default function Dashboard({
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-500 text-xs">
-                No habits yet. Create habits to see category progress.
-              </div>
+              <div className="text-center py-8 text-gray-500 text-xs">No habits yet. Create habits to see category progress.</div>
             )}
           </div>
-
           <div className="flex items-start space-x-2 bg-gray-950/20 border border-gray-800/40 rounded-xl p-3 text-left">
             <AlertTriangle className="w-4 h-4 text-[#FCC419] shrink-0 mt-0.5" />
             <p className="text-[11px] text-gray-400 leading-relaxed font-semibold">
@@ -1015,7 +1037,7 @@ export default function Dashboard({
           </div>
         </div>
 
-        {/* Routines Card List Widget */}
+        {/* Active Routines Widget */}
         <div className="bg-[#14161F]/90 border border-[#232734]/80 rounded-2xl p-6 flex flex-col justify-between min-h-[300px]">
           <div>
             <div className="flex items-center justify-between mb-4">
@@ -1027,30 +1049,19 @@ export default function Dashboard({
                 Manage &rarr;
               </span>
             </div>
-
             <div className="space-y-3 max-h-[180px] overflow-y-auto pr-1">
               {routines.map((rt) => {
                 const routineHabits = habits.filter(h => rt.habitIds.includes(h.id));
                 const completedInRt = routineHabits.filter(h => (h.history[dateToday] || 0) >= h.target).length;
                 const totalInRt = routineHabits.length;
                 const progress = totalInRt > 0 ? Math.round((completedInRt / totalInRt) * 100) : 0;
-
                 return (
-                  <div
-                    key={rt.id}
-                    onClick={() => {
-                      setTimeframeFilter('All');
-                      setSelectedRoutineSheetId(rt.id);
-                    }}
-                    className="bg-[#10121A] hover:bg-[#1E212E] border border-gray-800 p-3.5 rounded-xl cursor-pointer transition flex items-center justify-between group shadow"
-                  >
+                  <div key={rt.id}
+                    onClick={() => { setTimeframeFilter('All'); setSelectedRoutineSheetId(rt.id); }}
+                    className="bg-[#10121A] hover:bg-[#1E212E] border border-gray-800 p-3.5 rounded-xl cursor-pointer transition flex items-center justify-between group shadow">
                     <div className="text-left">
-                      <h4 className="text-xs font-bold text-white group-hover:text-[#12B886] transition">
-                        🔄 {rt.name}
-                      </h4>
-                      <p className="text-[10px] text-gray-500 mt-1 font-semibold">
-                        {completedInRt}/{totalInRt} habits done &bull; {rt.timeBlock}
-                      </p>
+                      <h4 className="text-xs font-bold text-white group-hover:text-[#12B886] transition">🔄 {rt.name}</h4>
+                      <p className="text-[10px] text-gray-500 mt-1 font-semibold">{completedInRt}/{totalInRt} habits done &bull; {rt.timeBlock}</p>
                     </div>
                     <div className="text-right font-sans">
                       <span className="text-xs font-bold text-purple-400 font-mono">{progress}%</span>
@@ -1061,7 +1072,6 @@ export default function Dashboard({
               })}
             </div>
           </div>
-
           <div className="text-[10px] text-gray-550 text-left font-semibold">
             Complete daily bundles together to earn bonus XP on whole routines.
           </div>
