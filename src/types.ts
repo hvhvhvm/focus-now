@@ -1,4 +1,5 @@
-export type Category = 'Fitness' | 'Reading' | 'Productivity' | 'Health' | 'Study' | 'Mindfulness' | 'Social' | 'Custom';
+export type Category = 'Fitness' | 'Reading' | 'Diet' | 'Skill' | 'Mindset' | 'Rest';
+
 
 export type HabitType = 'Count' | 'Timer';
 

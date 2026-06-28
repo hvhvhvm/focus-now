@@ -113,7 +113,10 @@ export default function MomentumPage({ habits, routines }: MomentumPageProps) {
 
   const fitnessProgress = getCategoryStats('Fitness');
   const readingProgress = getCategoryStats('Reading');
-  const productivityProgress = getCategoryStats('Productivity');
+  const dietProgress = getCategoryStats('Diet');
+  const skillProgress = getCategoryStats('Skill');
+  const mindsetProgress = getCategoryStats('Mindset');
+  const restProgress = getCategoryStats('Rest');
 
   // Days tracked for Lock In status
   const daysShort = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -176,7 +179,7 @@ export default function MomentumPage({ habits, routines }: MomentumPageProps) {
   const fillPath = `${linePath} L ${points[points.length - 1].x} 45 L ${points[0].x} 45 Z`;
 
   const currentGradeValue = Math.round(
-    (fitnessProgress + readingProgress + productivityProgress) / 3
+    (fitnessProgress + readingProgress + dietProgress + skillProgress + mindsetProgress + restProgress) / 6
   );
 
   return (
@@ -466,7 +469,10 @@ export default function MomentumPage({ habits, routines }: MomentumPageProps) {
                   {[
                     { name: 'Fitness', progress: fitnessProgress },
                     { name: 'Reading', progress: readingProgress },
-                    { name: 'Productivity', progress: productivityProgress }
+                    { name: 'Diet', progress: dietProgress },
+                    { name: 'Skill', progress: skillProgress },
+                    { name: 'Mindset', progress: mindsetProgress },
+                    { name: 'Rest', progress: restProgress }
                   ].map((item) => {
                     const isSuccess = item.progress >= 75;
                     return (
@@ -478,7 +484,7 @@ export default function MomentumPage({ habits, routines }: MomentumPageProps) {
                         }`}>
                           <span className="text-xl font-bold">{isSuccess ? '✓' : '—'}</span>
                         </div>
-                        <span className="text-[10px] font-bold text-gray-400 mt-2 font-sans tracking-wide block uppercase text-center">
+                        <span className="text-[10px] font-bold text-gray-400 mt-2 font-sans tracking-wide block uppercase text-center font-semibold">
                           {item.name}
                         </span>
                       </div>
@@ -490,13 +496,22 @@ export default function MomentumPage({ habits, routines }: MomentumPageProps) {
               {/* Bottom active subpills */}
               <div className="flex flex-wrap gap-2 pt-6 select-none">
                 <span className="border border-emerald-500/20 bg-emerald-500/10 text-[#12B886] text-[10px] font-mono font-bold px-3 py-1 rounded-full flex items-center gap-1.5 uppercase tracking-wide">
-                  <span>💪</span> Fitness {fitnessProgress}%
+                  <span>🏃</span> Fitness {fitnessProgress}%
+                </span>
+                <span className="border border-blue-500/20 bg-blue-500/10 text-blue-400 text-[10px] font-mono font-bold px-3 py-1 rounded-full flex items-center gap-1.5 uppercase tracking-wide">
+                  <span>📚</span> Reading {readingProgress}%
+                </span>
+                <span className="border border-orange-500/20 bg-orange-500/10 text-[#FD7E14] text-[10px] font-mono font-bold px-3 py-1 rounded-full flex items-center gap-1.5 uppercase tracking-wide">
+                  <span>🥗</span> Diet {dietProgress}%
+                </span>
+                <span className="border border-amber-500/20 bg-amber-500/10 text-amber-500 text-[10px] font-mono font-bold px-3 py-1 rounded-full flex items-center gap-1.5 uppercase tracking-wide">
+                  <span>🎯</span> Skill {skillProgress}%
                 </span>
                 <span className="border border-purple-500/20 bg-purple-500/10 text-purple-400 text-[10px] font-mono font-bold px-3 py-1 rounded-full flex items-center gap-1.5 uppercase tracking-wide">
-                  <span>📖</span> Reading {readingProgress}%
+                  <span>🧘</span> Mindset {mindsetProgress}%
                 </span>
-                <span className="border border-orange-500/20 bg-orange-500/10 text-orange-400 text-[10px] font-mono font-bold px-3 py-1 rounded-full flex items-center gap-1.5 uppercase tracking-wide">
-                  <span>⚡</span> Productivity {productivityProgress}%
+                <span className="border border-cyan-500/20 bg-cyan-500/10 text-[#06B6D4] text-[10px] font-mono font-bold px-3 py-1 rounded-full flex items-center gap-1.5 uppercase tracking-wide">
+                  <span>😴</span> Rest {restProgress}%
                 </span>
               </div>
             </div>

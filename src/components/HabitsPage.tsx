@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
   Zap, Clock, Repeat, Plus, Check, Play, Pause, RotateCcw,
   ChevronLeft, MoreVertical, Trash2, Pencil, Undo2,
-  Dumbbell, BookOpen, Heart, Brain, Navigation, Sparkles, CalendarDays
+  Dumbbell, BookOpen, Heart, Brain, Navigation, Sparkles, CalendarDays,
+  Target, Moon
 } from 'lucide-react';
 import { Habit, Category, Routine } from '../types';
 import { dateToday, isHabitScheduledForDate, formatDateString, getStandaloneHabits } from '../data';
@@ -11,14 +12,12 @@ import { useToast } from './Toast';
 
 // ─── CATEGORY CONFIG ───────────────────────────────────────────────────────────
 const CAT_CFG: Record<string, { color: string; emoji: string; icon: React.ElementType }> = {
-  Fitness:      { color: '#4ecf7f', emoji: '🏃', icon: Dumbbell },
-  Reading:      { color: '#4f8ef7', emoji: '📚', icon: BookOpen },
-  Productivity: { color: '#f5a623', emoji: '⚡', icon: Zap },
-  Health:       { color: '#ff6b6b', emoji: '❤️', icon: Heart },
-  Mindfulness:  { color: '#38c4c4', emoji: '🧘', icon: Brain },
-  Study:        { color: '#a78bf7', emoji: '📖', icon: Sparkles },
-  Social:       { color: '#f76b8a', emoji: '👥', icon: Navigation },
-  Custom:       { color: '#868E96', emoji: '⭐', icon: Sparkles },
+  Fitness:      { color: '#12B886', emoji: '🏃', icon: Dumbbell },
+  Reading:      { color: '#339AF0', emoji: '📚', icon: BookOpen },
+  Diet:         { color: '#FD7E14', emoji: '🥗', icon: Heart },
+  Skill:        { color: '#FCC419', emoji: '🎯', icon: Target },
+  Mindset:      { color: '#845EF7', emoji: '🧘', icon: Brain },
+  Rest:         { color: '#06B6D4', emoji: '😴', icon: Moon },
 };
 
 const getCatConfig = (cat: Category) => CAT_CFG[cat] ?? { color: '#868E96', emoji: '⭐', icon: Sparkles };
@@ -256,7 +255,7 @@ export default function HabitsPage({
 
       {/* Category filter row */}
       <div className="flex flex-nowrap items-center gap-2 border-b border-[#1A1D24] pb-4 overflow-x-auto scrollbar-hide">
-        {(['All','Health','Fitness','Study','Reading','Productivity','Mindfulness','Social'] as const).map(cat => {
+        {(['All','Fitness','Reading','Diet','Skill','Mindset','Rest'] as const).map(cat => {
           const isA = selectedCategory === cat;
           const prog = cat !== 'All' ? getCategoryStats(cat as Category) : 0;
           const color = cat !== 'All' ? getCatConfig(cat as Category).color : '#4ecf7f';

@@ -16,7 +16,7 @@ export const getCategoryStyles = (category: Category) => {
   switch (category) {
     case 'Fitness':
       return {
-        color: '#12B886', // Neon emerald
+        color: '#12B886', // Emerald
         borderClass: 'border-l-[5px] border-l-[#12B886]',
         textColor: 'text-[#12B886]',
         accentClass: 'border-[#12B886]/20 bg-[#12B886]/5 text-[#12B886]',
@@ -27,7 +27,18 @@ export const getCategoryStyles = (category: Category) => {
       };
     case 'Reading':
       return {
-        color: '#FD7E14', // Warm orange
+        color: '#339AF0', // Bright Blue
+        borderClass: 'border-l-[5px] border-l-[#339AF0]',
+        textColor: 'text-[#339AF0]',
+        accentClass: 'border-[#339AF0]/20 bg-[#339AF0]/5 text-[#339AF0]',
+        progressBarClass: 'bg-[#339AF0]',
+        buttonClass: 'border-[#339AF0]/15 hover:bg-[#339AF0]/20 text-[#339AF0] hover:text-white',
+        inputFocusClass: 'focus:border-[#339AF0]/60',
+        badgeClass: 'bg-[#339AF0]/10 text-[#339AF0] border border-[#339AF0]/20'
+      };
+    case 'Diet':
+      return {
+        color: '#FD7E14', // Orange
         borderClass: 'border-l-[5px] border-l-[#FD7E14]',
         textColor: 'text-[#FD7E14]',
         accentClass: 'border-[#FD7E14]/20 bg-[#FD7E14]/5 text-[#FD7E14]',
@@ -36,9 +47,9 @@ export const getCategoryStyles = (category: Category) => {
         inputFocusClass: 'focus:border-[#FD7E14]/60',
         badgeClass: 'bg-[#FD7E14]/10 text-[#FD7E14] border border-[#FD7E14]/20'
       };
-    case 'Productivity':
+    case 'Skill':
       return {
-        color: '#FCC419', // Amber yellow
+        color: '#FCC419', // Amber Yellow
         borderClass: 'border-l-[5px] border-l-[#FCC419]',
         textColor: 'text-[#FCC419]',
         accentClass: 'border-[#FCC419]/25 bg-[#FCC419]/5 text-[#FCC419]',
@@ -47,20 +58,9 @@ export const getCategoryStyles = (category: Category) => {
         inputFocusClass: 'focus:border-[#FCC419]/60',
         badgeClass: 'bg-[#FCC419]/10 text-[#FCC419] border border-[#FCC419]/20'
       };
-    case 'Health':
+    case 'Mindset':
       return {
-        color: '#228BE6', // Clear blue
-        borderClass: 'border-l-[5px] border-l-[#228BE6]',
-        textColor: 'text-[#339AF0]',
-        accentClass: 'border-[#228BE6]/20 bg-[#228BE6]/5 text-[#339AF0]',
-        progressBarClass: 'bg-[#228BE6]',
-        buttonClass: 'border-[#228BE6]/15 hover:bg-[#228BE6]/20 text-[#228BE6] hover:text-white',
-        inputFocusClass: 'focus:border-[#228BE6]/60',
-        badgeClass: 'bg-[#228BE6]/10 text-[#228BE6] border border-[#228BE6]/20'
-      };
-    case 'Mindfulness':
-      return {
-        color: '#845EF7', // Deep purple
+        color: '#845EF7', // Grape Violet
         borderClass: 'border-l-[5px] border-l-[#845EF7]',
         textColor: 'text-[#B197FC]',
         accentClass: 'border-[#845EF7]/20 bg-[#845EF7]/5 text-[#B197FC]',
@@ -69,27 +69,16 @@ export const getCategoryStyles = (category: Category) => {
         inputFocusClass: 'focus:border-[#845EF7]/60',
         badgeClass: 'bg-[#845EF7]/10 text-[#B197FC] border border-[#845EF7]/20'
       };
-    case 'Study':
+    case 'Rest':
       return {
-        color: '#20C997', // Teal
-        borderClass: 'border-l-[5px] border-l-[#20C997]',
-        textColor: 'text-[#20C997]',
-        accentClass: 'border-[#20C997]/20 bg-[#20C997]/5 text-[#20C997]',
-        progressBarClass: 'bg-[#20C997]',
-        buttonClass: 'border-[#20C997]/15 hover:bg-[#20C997]/20 text-[#20C997] hover:text-white',
-        inputFocusClass: 'focus:border-[#20C997]/60',
-        badgeClass: 'bg-[#20C997]/10 text-[#20C997] border border-[#20C997]/20'
-      };
-    case 'Social':
-      return {
-        color: '#B54708', // Rust brown / deep orange
-        borderClass: 'border-l-[5px] border-l-[#B54708]',
-        textColor: 'text-[#B54708]',
-        accentClass: 'border-[#B54708]/20 bg-[#B54708]/5 text-[#B54708]',
-        progressBarClass: 'bg-[#B54708]',
-        buttonClass: 'border-[#B54708]/15 hover:bg-[#B54708]/20 text-[#B54708] hover:text-white',
-        inputFocusClass: 'focus:border-[#B54708]/60',
-        badgeClass: 'bg-[#B54708]/10 text-[#B54708] border border-[#B54708]/20'
+        color: '#06B6D4', // Cyan
+        borderClass: 'border-l-[5px] border-l-[#06B6D4]',
+        textColor: 'text-[#06B6D4]',
+        accentClass: 'border-[#06B6D4]/20 bg-[#06B6D4]/5 text-[#06B6D4]',
+        progressBarClass: 'bg-[#06B6D4]',
+        buttonClass: 'border-[#06B6D4]/15 hover:bg-[#06B6D4]/20 text-[#06B6D4] hover:text-white',
+        inputFocusClass: 'focus:border-[#06B6D4]/60',
+        badgeClass: 'bg-[#06B6D4]/10 text-[#06B6D4] border border-[#06B6D4]/20'
       };
     default:
       return {

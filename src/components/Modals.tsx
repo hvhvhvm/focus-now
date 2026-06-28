@@ -70,14 +70,12 @@ export function CreateHabitModal({ isOpen, onClose, onCreate, onSave, habitToEdi
 
   // ✅ FIX: was "routineCategories" (undefined) — renamed to "categories" throughout
   const categories: { id: Category; label: string; icon: string; color: string; activeClass: string }[] = [
-    { id: 'Health',       label: 'Health',       icon: '❤️',  color: 'text-rose-400',   activeClass: 'border-rose-500 bg-rose-500/10 text-rose-400 ring-2 ring-rose-500/5' },
-    { id: 'Fitness',      label: 'Fitness',      icon: '🏃',  color: 'text-emerald-400', activeClass: 'border-emerald-500 bg-emerald-500/10 text-emerald-400 ring-2 ring-emerald-500/5' },
-    { id: 'Study',        label: 'Study',        icon: '📝',  color: 'text-cyan-400',   activeClass: 'border-cyan-500 bg-cyan-500/10 text-cyan-400 ring-2 ring-cyan-500/5' },
-    { id: 'Reading',      label: 'Reading',      icon: '📖',  color: 'text-purple-400', activeClass: 'border-purple-500 bg-purple-500/10 text-purple-400 ring-2 ring-purple-500/5' },
-    { id: 'Productivity', label: 'Productivity', icon: '⚡',  color: 'text-amber-400',  activeClass: 'border-amber-500 bg-amber-500/10 text-amber-400 ring-2 ring-amber-500/5' },
-    { id: 'Mindfulness',  label: 'Mindfulness',  icon: '🧘',  color: 'text-orange-400', activeClass: 'border-orange-500 bg-orange-500/10 text-orange-400 ring-2 ring-orange-500/5' },
-    { id: 'Social',       label: 'Social',       icon: '👥',  color: 'text-blue-400',   activeClass: 'border-blue-500 bg-blue-500/10 text-blue-400 ring-2 ring-blue-500/5' },
-    { id: 'Custom',       label: 'Custom',       icon: '📌',  color: 'text-pink-400',   activeClass: 'border-pink-500 bg-pink-500/10 text-pink-400 ring-2 ring-pink-500/5' },
+    { id: 'Fitness',      label: 'Fitness',      icon: '🏃',  color: 'text-rose-400',   activeClass: 'border-rose-500 bg-rose-500/10 text-rose-400 ring-2 ring-rose-500/5' },
+    { id: 'Reading',      label: 'Reading',      icon: '📚',  color: 'text-blue-400',   activeClass: 'border-blue-500 bg-blue-500/10 text-blue-400 ring-2 ring-blue-500/5' },
+    { id: 'Diet',         label: 'Diet',         icon: '🥗',  color: 'text-emerald-400', activeClass: 'border-emerald-500 bg-emerald-500/10 text-emerald-400 ring-2 ring-emerald-500/5' },
+    { id: 'Skill',        label: 'Skill',        icon: '🎯',  color: 'text-amber-400',  activeClass: 'border-amber-500 bg-amber-500/10 text-amber-400 ring-2 ring-amber-500/5' },
+    { id: 'Mindset',      label: 'Mindset',      icon: '🧘',  color: 'text-purple-400', activeClass: 'border-purple-500 bg-purple-500/10 text-purple-400 ring-2 ring-purple-500/5' },
+    { id: 'Rest',         label: 'Rest',         icon: '😴',  color: 'text-cyan-400',   activeClass: 'border-cyan-500 bg-cyan-500/10 text-cyan-400 ring-2 ring-cyan-500/5' },
   ];
 
   if (!isOpen) return null;
@@ -449,20 +447,18 @@ export function CreateRoutineModal({ isOpen, onClose, onCreate }: CreateRoutineM
     setName('');
     setAwardPoints(25);
     setTimeBlock('Morning');
-    setCategory('Health');
+    setCategory('Fitness');
     setRepeat('Daily');
     setHabitLines(['']);
   };
 
   const categories: { id: Category; label: string; icon: string; activeClass: string }[] = [
-    { id: 'Health',       label: 'Health',       icon: '❤️',  activeClass: 'border-rose-500 bg-rose-500/10 text-rose-400' },
-    { id: 'Fitness',      label: 'Fitness',      icon: '💪',  activeClass: 'border-emerald-500 bg-emerald-500/10 text-emerald-400' },
-    { id: 'Study',        label: 'Study',        icon: '📝',  activeClass: 'border-cyan-500 bg-cyan-500/10 text-cyan-400' },
-    { id: 'Reading',      label: 'Reading',      icon: '📖',  activeClass: 'border-purple-500 bg-purple-500/10 text-purple-400' },
-    { id: 'Productivity', label: 'Productivity', icon: '⚡',  activeClass: 'border-amber-500 bg-amber-500/10 text-amber-400' },
-    { id: 'Mindfulness',  label: 'Mindfulness',  icon: '🧘',  activeClass: 'border-orange-500 bg-orange-500/10 text-orange-400' },
-    { id: 'Social',       label: 'Social',       icon: '👥',  activeClass: 'border-blue-500 bg-blue-500/10 text-blue-400' },
-    { id: 'Custom',       label: 'Custom',       icon: '📌',  activeClass: 'border-pink-500 bg-pink-500/10 text-pink-400' },
+    { id: 'Fitness',      label: 'Fitness',      icon: '🏃',  activeClass: 'border-rose-500 bg-rose-500/10 text-rose-400' },
+    { id: 'Reading',      label: 'Reading',      icon: '📚',  activeClass: 'border-blue-500 bg-blue-500/10 text-blue-400' },
+    { id: 'Diet',         label: 'Diet',         icon: '🥗',  activeClass: 'border-emerald-500 bg-emerald-500/10 text-emerald-400' },
+    { id: 'Skill',        label: 'Skill',        icon: '🎯',  activeClass: 'border-amber-500 bg-amber-500/10 text-amber-400' },
+    { id: 'Mindset',      label: 'Mindset',      icon: '🧘',  activeClass: 'border-purple-500 bg-purple-500/10 text-purple-400' },
+    { id: 'Rest',         label: 'Rest',         icon: '😴',  activeClass: 'border-cyan-500 bg-cyan-500/10 text-cyan-400' },
   ];
 
   const timeBlocks: { id: typeof timeBlock; label: string; icon: string; activeClass: string }[] = [

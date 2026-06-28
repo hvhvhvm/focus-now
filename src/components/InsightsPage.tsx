@@ -105,7 +105,7 @@ export default function InsightsPage({ habits, userPoints }: InsightsPageProps) 
   const categoriesToAnalyzeState = [
     { 
       name: 'Fitness', 
-      icon: '💪', 
+      icon: '🏃', 
       theme: 'text-[#12B886] bg-[#12B886]/10 border-[#12B886]/20', 
       barColor: 'bg-[#12B886]',
       quote: 'Excellent conditioning loops logged this week.' 
@@ -113,23 +113,37 @@ export default function InsightsPage({ habits, userPoints }: InsightsPageProps) 
     { 
       name: 'Reading', 
       icon: '📚', 
-      theme: 'text-[#845EF7] bg-[#845EF7]/10 border-[#845EF7]/20', 
-      barColor: 'bg-[#845EF7]',
+      theme: 'text-[#339AF0] bg-[#339AF0]/10 border-[#339AF0]/20', 
+      barColor: 'bg-[#339AF0]',
       quote: 'Absorption rate of focus frameworks continues to steady.' 
     },
     { 
-      name: 'Productivity', 
-      icon: '⚡', 
-      theme: 'text-[#FF922B] bg-[#FF922B]/10 border-[#FF922B]/20', 
-      barColor: 'bg-[#FF922B]',
-      quote: 'Focused work sessions are shaping automatic neural rituals.' 
+      name: 'Diet', 
+      icon: '🥗', 
+      theme: 'text-[#FD7E14] bg-[#FD7E14]/10 border-[#FD7E14]/20', 
+      barColor: 'bg-[#FD7E14]',
+      quote: 'Autonomic recovery loops checked. Nutrient intake is optimized.' 
     },
     { 
-      name: 'Mindfulness', 
+      name: 'Skill', 
+      icon: '🎯', 
+      theme: 'text-[#FCC419] bg-[#FCC419]/10 border-[#FCC419]/20', 
+      barColor: 'bg-[#FCC419]',
+      quote: 'Focused skill sessions are shaping automatic neural rituals.' 
+    },
+    { 
+      name: 'Mindset', 
       icon: '🧘', 
-      theme: 'text-[#15AABF] bg-[#15AABF]/10 border-[#15AABF]/20', 
-      barColor: 'bg-[#15AABF]',
-      quote: 'Autonomic recovery loops checked. Mental stamina is high!' 
+      theme: 'text-[#845EF7] bg-[#845EF7]/10 border-[#845EF7]/20', 
+      barColor: 'bg-[#845EF7]',
+      quote: 'Mental conditioning loops checked. Mindset stamina is high!' 
+    },
+    { 
+      name: 'Rest', 
+      icon: '😴', 
+      theme: 'text-[#06B6D4] bg-[#06B6D4]/10 border-[#06B6D4]/20', 
+      barColor: 'bg-[#06B6D4]',
+      quote: 'Stamina recharged. Sleep patterns and active recovery are healthy.' 
     },
   ];
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Zap, AlertTriangle, ArrowUpRight, TrendingUp, Dumbbell, BookOpen, Brain, Sparkles, CheckCircle2, Navigation, Clock, Check, ChevronRight, X } from 'lucide-react';
+import { Zap, AlertTriangle, ArrowUpRight, TrendingUp, Dumbbell, BookOpen, Brain, Sparkles, CheckCircle2, Navigation, Clock, Check, ChevronRight, X, Target, Heart, Moon } from 'lucide-react';
 import { Habit, Category, Routine } from '../types';
 import { calculateMomentum, dateToday, getDailyTaskCounts, getStandaloneHabits } from '../data';
 import CategoryDetailView from './CategoryDetailView';
@@ -10,13 +10,12 @@ type LogHabitHandler = (id: string, value: number) => void | Promise<void>;
 
 const getCategoryColor = (category: Category): string => {
   switch (category) {
-    case 'Fitness':     return '#12B886';
-    case 'Reading':     return '#4f8ef7';
-    case 'Productivity':return '#FCC419';
-    case 'Health':      return '#e86464';
-    case 'Mindfulness': return '#845EF7';
-    case 'Study':       return '#a78bf7';
-    case 'Social':      return '#B54708';
+    case 'Fitness':     return '#12B886'; // Emerald
+    case 'Reading':     return '#339AF0'; // Blue
+    case 'Diet':        return '#FD7E14'; // Orange
+    case 'Skill':       return '#FCC419'; // Amber
+    case 'Mindset':     return '#845EF7'; // Purple
+    case 'Rest':        return '#06B6D4'; // Cyan
     default:            return '#868E96';
   }
 };
@@ -25,11 +24,10 @@ const getCategoryEmoji = (category: Category): string => {
   switch (category) {
     case 'Fitness':     return '🏃';
     case 'Reading':     return '📚';
-    case 'Productivity':return '⚡';
-    case 'Health':      return '❤️';
-    case 'Mindfulness': return '🧘';
-    case 'Study':       return '📖';
-    case 'Social':      return '👥';
+    case 'Diet':        return '🥗';
+    case 'Skill':       return '🎯';
+    case 'Mindset':     return '🧘';
+    case 'Rest':        return '😴';
     default:            return '⭐';
   }
 };
@@ -65,13 +63,24 @@ const getHabitTimeframe = (habit: Habit, routines: Routine[]): 'Morning' | 'Even
 const getQuickHabitConfig = (category: Category) => {
   switch (category) {
     case 'Fitness':     return { color: '#12B886', icon: Dumbbell };
-    case 'Reading':     return { color: '#FD7E14', icon: BookOpen };
-    case 'Productivity':return { color: '#FCC419', icon: Zap };
-    case 'Health':      return { color: '#e86464', icon: Brain };
-    case 'Mindfulness': return { color: '#845EF7', icon: Brain };
-    case 'Study':       return { color: '#a78bf7', icon: Sparkles };
-    case 'Social':      return { color: '#B54708', icon: Navigation };
+    case 'Reading':     return { color: '#339AF0', icon: BookOpen };
+    case 'Diet':        return { color: '#FD7E14', icon: Heart };
+    case 'Skill':       return { color: '#FCC419', icon: Target };
+    case 'Mindset':     return { color: '#845EF7', icon: Brain };
+    case 'Rest':        return { color: '#06B6D4', icon: Moon };
     default:            return { color: '#868E96', icon: Sparkles };
+  }
+};
+
+const getCategoryLabel = (category: Category): string => {
+  switch (category) {
+    case 'Fitness': return 'Fit';
+    case 'Reading': return 'Read';
+    case 'Diet':    return 'Diet';
+    case 'Skill':   return 'Skil';
+    case 'Mindset': return 'Mind';
+    case 'Rest':    return 'Rest';
+    default:        return category.slice(0, 4);
   }
 };
 
@@ -80,10 +89,11 @@ const getQuickHabitConfig = (category: Category) => {
 interface CategoryRingProps {
   category: Category;
   pct: number;
+  isSelected: boolean;
   onClick: () => void;
 }
 
-function CategoryRing({ category, pct, onClick }: CategoryRingProps) {
+function CategoryRing({ category, pct, isSelected, onClick }: CategoryRingProps) {
   const color = getCategoryColor(category);
   const emoji = getCategoryEmoji(category);
   const size = 56;
@@ -95,57 +105,67 @@ function CategoryRing({ category, pct, onClick }: CategoryRingProps) {
   return (
     <div
       onClick={onClick}
-      className="flex flex-col items-center gap-1.5 cursor-pointer group flex-shrink-0"
-      style={{ minWidth: 64 }}
+      className="flex flex-col items-center gap-1 md:gap-1.5 cursor-pointer group flex-shrink-0 flex-1 md:flex-initial min-w-[50px] md:min-w-[64px] select-none"
     >
-      <div className="relative" style={{ width: size, height: size }}>
-        <svg
-          width={size}
-          height={size}
-          viewBox={`0 0 ${size} ${size}`}
-          style={{ transform: 'rotate(-90deg)' }}
-        >
-          <circle
-            cx={size / 2} cy={size / 2} r={r}
-            fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={stroke}
-          />
-          <circle
-            cx={size / 2} cy={size / 2} r={r}
-            fill="none" stroke={color} strokeWidth={stroke}
-            strokeDasharray={circ}
-            strokeDashoffset={offset}
-            strokeLinecap="round"
-            style={{
-              transition: 'stroke-dashoffset 0.6s ease',
-              filter: pct > 0 ? `drop-shadow(0 0 5px ${color}99)` : 'none',
-            }}
-          />
-        </svg>
-        {/* Emoji center */}
-        <div
-          className="absolute inset-0 flex items-center justify-center text-[18px] group-hover:scale-110 transition-transform duration-200"
-        >
-          {emoji}
-        </div>
-        {/* Active glow border */}
-        {pct === 100 && (
+      <div 
+        className={`relative flex items-center justify-center transition-all duration-300 rounded-full ${
+          isSelected 
+            ? 'border-2 border-[var(--color)] shadow-[0_0_10px_var(--color-glow)] scale-105' 
+            : 'border-2 border-transparent'
+        } p-0.5 md:p-1 w-[46px] h-[46px] md:w-[64px] md:h-[64px]`}
+        style={{
+          '--color': color,
+          '--color-glow': `${color}cc`,
+        } as React.CSSProperties}
+      >
+        <div className="relative animate-fade-in w-9 h-9 md:w-14 md:h-14">
+          <svg
+            className="w-full h-full"
+            viewBox={`0 0 ${size} ${size}`}
+            style={{ transform: 'rotate(-90deg)' }}
+          >
+            <circle
+              cx={size / 2} cy={size / 2} r={r}
+              fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={stroke}
+            />
+            <circle
+              cx={size / 2} cy={size / 2} r={r}
+              fill="none" stroke={color} strokeWidth={stroke}
+              strokeDasharray={circ}
+              strokeDashoffset={offset}
+              strokeLinecap="round"
+              style={{
+                transition: 'stroke-dashoffset 0.6s ease',
+                filter: pct > 0 ? `drop-shadow(0 0 5px ${color}99)` : 'none',
+              }}
+            />
+          </svg>
+          {/* Emoji center */}
           <div
-            className="absolute inset-0 rounded-full"
-            style={{
-              boxShadow: `0 0 12px ${color}66`,
-              borderRadius: '50%',
-              pointerEvents: 'none',
-            }}
-          />
-        )}
+            className="absolute inset-0 flex items-center justify-center text-[14px] md:text-[18px] group-hover:scale-110 transition-transform duration-200"
+          >
+            {emoji}
+          </div>
+          {/* Active glow border */}
+          {pct === 100 && (
+            <div
+              className="absolute inset-0 rounded-full"
+              style={{
+                boxShadow: `0 0 12px ${color}66`,
+                borderRadius: '50%',
+                pointerEvents: 'none',
+              }}
+            />
+          )}
+        </div>
       </div>
       <div
-        className="text-[9px] font-mono font-bold text-center leading-tight truncate max-w-[60px]"
-        style={{ color: pct > 0 ? color : 'rgba(255,255,255,0.25)' }}
+        className="text-[8px] md:text-[9px] font-mono font-bold text-center leading-tight truncate max-w-[44px] md:max-w-[60px] mt-0.5"
+        style={{ color: isSelected || pct > 0 ? color : 'rgba(255,255,255,0.25)' }}
       >
-        {pct > 0 ? `${pct}%` : category.slice(0, 5)}
+        {pct > 0 ? `${pct}%` : getCategoryLabel(category)}
       </div>
-      <div className="text-[8px] text-center text-gray-600 truncate max-w-[60px]">
+      <div className="text-[7px] md:text-[8px] text-center text-gray-600 truncate max-w-[44px] md:max-w-[60px]">
         {category}
       </div>
     </div>
@@ -158,86 +178,64 @@ interface CategoryRingsCardProps {
   categories: Category[];
   getCategoryStats: (cat: Category) => number;
   overallAvg: number;
-  onSelectCategory: (cat: Category) => void;
+  selectedPillar: Category | null;
+  onSelectCategory: (cat: Category | null) => void;
 }
 
-function CategoryRingsCard({ categories, getCategoryStats, overallAvg, onSelectCategory }: CategoryRingsCardProps) {
-  const scoreColor =
-    overallAvg >= 80 ? '#12B886' :
-    overallAvg >= 50 ? '#228BE6' :
-    overallAvg >= 20 ? '#FCC419' : '#FA5252';
-
+function CategoryRingsCard({ categories, getCategoryStats, overallAvg, selectedPillar, onSelectCategory }: CategoryRingsCardProps) {
   if (categories.length === 0) return null;
 
   return (
-    <div className="bg-[#14161F] border border-[#232734] rounded-2xl p-4 relative overflow-hidden">
-      {/* Subtle glow */}
-      <div
-        className="absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl pointer-events-none"
-        style={{ background: `radial-gradient(circle, ${scoreColor}0a 0%, transparent 70%)` }}
-      />
-
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <div className="text-[10px] font-mono text-gray-500 tracking-widest uppercase">
-            CATEGORY SCORE
-          </div>
-          <div
-            className="text-xl font-extrabold font-mono mt-0.5 transition-colors duration-500"
-            style={{ color: scoreColor }}
+    <div className="bg-[#14161F]/90 border border-[#232734]/80 rounded-2xl p-5 relative overflow-hidden group/pillars transition-all duration-350 hover:border-gray-800">
+      {/* Title block */}
+      <div className="flex items-center justify-between mb-5">
+        <h3 className="text-sm font-bold text-gray-400 font-sans tracking-wide">
+          6 Pillars
+        </h3>
+        {selectedPillar && (
+          <button
+            onClick={() => onSelectCategory(null)}
+            className="text-xs font-bold text-[#339AF0] hover:text-[#4dabf7] flex items-center gap-1 transition cursor-pointer select-none"
           >
-            {overallAvg}%
-          </div>
-        </div>
-        <div className="text-[10px] font-mono text-gray-600 text-right">
-          Tap a ring<br />to filter ↓
-        </div>
+            Show all <X className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
 
-      {/* Rings row */}
-      <div className="flex gap-3 overflow-x-auto scrollbar-none pb-1">
+      {/* Rings Row */}
+      <div className="flex justify-between items-center gap-2 overflow-x-auto scrollbar-none pb-1">
         {categories.map(cat => (
           <CategoryRing
             key={cat}
             category={cat}
             pct={getCategoryStats(cat)}
-            onClick={() => onSelectCategory(cat)}
+            isSelected={selectedPillar === cat}
+            onClick={() => onSelectCategory(selectedPillar === cat ? null : cat)}
           />
         ))}
       </div>
 
-      {/* Multi-segment bar */}
-      <div className="flex gap-1 mt-4">
+      {/* Multi-segment progress bar */}
+      <div className="flex gap-1.5 mt-5">
         {categories.map(cat => {
           const pct = getCategoryStats(cat);
           const color = getCategoryColor(cat);
           return (
             <div
               key={cat}
-              className="flex-1 h-1.5 rounded-full overflow-hidden"
-              style={{ background: 'rgba(255,255,255,0.06)' }}
+              className="flex-1 h-1 bg-[#1A1C29] rounded-full overflow-hidden"
             >
               <div
                 className="h-full rounded-full transition-all duration-500"
                 style={{
                   width: `${pct}%`,
                   background: color,
-                  boxShadow: pct > 0 ? `0 0 4px ${color}88` : 'none',
+                  boxShadow: pct > 0 ? `0 0 5px ${color}88` : 'none',
                 }}
               />
             </div>
           );
         })}
-      </div>
-
-      {/* Category emoji legend */}
-      <div className="flex gap-1 mt-1.5">
-        {categories.map(cat => (
-          <div key={cat} className="flex-1 text-center text-[9px] text-gray-700">
-            {getCategoryEmoji(cat)}
-          </div>
-        ))}
       </div>
     </div>
   );
@@ -445,10 +443,12 @@ export default function Dashboard({
     return Math.round(completedRatioSum / catHabits.length);
   };
 
+  const [selectedPillar, setSelectedPillar] = useState<Category | null>(null);
+
   const activeCategories = React.useMemo(() => {
     const cats = new Set<Category>();
     standaloneHabitsAll.forEach((h) => cats.add(h.category));
-    const order: Category[] = ['Fitness', 'Reading', 'Productivity', 'Health', 'Study', 'Mindfulness', 'Social', 'Custom'];
+    const order: Category[] = ['Fitness', 'Reading', 'Diet', 'Skill', 'Mindset', 'Rest'];
     return order.filter((c) => cats.has(c));
   }, [standaloneHabitsAll]);
 
@@ -758,15 +758,14 @@ export default function Dashboard({
 
       </div>
 
-      {/* ── CATEGORY RINGS ── */}
-      {activeCategories.length > 0 && (
-        <CategoryRingsCard
-          categories={activeCategories}
-          getCategoryStats={getCategoryStats}
-          overallAvg={overallCategoryAvg}
-          onSelectCategory={setSelectedCategoryId}
-        />
-      )}
+      {/* ── 6 PILLARS RINGS ── */}
+      <CategoryRingsCard
+        categories={['Fitness', 'Reading', 'Diet', 'Skill', 'Mindset', 'Rest']}
+        getCategoryStats={getCategoryStats}
+        overallAvg={overallCategoryAvg}
+        selectedPillar={selectedPillar}
+        onSelectCategory={setSelectedPillar}
+      />
 
       {/* ── QUICK HABIT LOGGER ── */}
       <div id="quick-habit-logger-section" className="bg-[#14161F]/90 border border-[#232734]/80 p-4 md:p-6 rounded-2xl shadow-lg relative overflow-hidden group/logger duration-300 transition-all hover:border-[#12B886]/20 hover:shadow-[0_0_35px_rgba(18,184,134,0.03)]">
@@ -781,29 +780,57 @@ export default function Dashboard({
           </span>
         </div>
 
+        {/* Selected Category/Pillar Filter Banner */}
+        {selectedPillar && (
+          <div 
+            className="mb-4 py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 border font-sans text-sm font-semibold select-none animate-fade-in transition-all duration-350 relative z-10"
+            style={{
+              backgroundColor: `${getCategoryColor(selectedPillar)}10`,
+              borderColor: `${getCategoryColor(selectedPillar)}25`,
+              color: getCategoryColor(selectedPillar)
+            }}
+          >
+            <span className="text-base">{getCategoryEmoji(selectedPillar)}</span>
+            <span>Filtered: {selectedPillar} habits</span>
+          </div>
+        )}
+
         {(() => {
-          const allHabits = standaloneHabitsAll;
+          const allHabitsFiltered = selectedPillar
+            ? standaloneHabitsAll.filter(h => h.category === selectedPillar)
+            : standaloneHabitsAll;
+
+          const routinesFiltered = selectedPillar
+            ? routines.filter(rt => habits.filter(h => rt.habitIds.includes(h.id) && h.category === selectedPillar).length > 0)
+            : routines;
+
           const habitMatchesTimeframe = (h: Habit) =>
             timeframeFilter === 'All' || getHabitTimeframe(h, routines) === timeframeFilter;
 
-          const allCount = standaloneHabitsAll.length + routines.length;
-          const morningCount =
-            standaloneHabitsAll.filter(h => getHabitTimeframe(h, routines) === 'Morning').length +
-            routines.filter(rt => rt.timeBlock === 'Morning').length;
-          const eveningCount =
-            standaloneHabitsAll.filter(h => getHabitTimeframe(h, routines) === 'Evening').length +
-            routines.filter(rt => rt.timeBlock === 'Evening').length;
-          const nightCount =
-            standaloneHabitsAll.filter(h => getHabitTimeframe(h, routines) === 'Night').length +
-            routines.filter(rt => rt.timeBlock === 'Night').length;
-          const anytimeCount =
-            standaloneHabitsAll.filter(h => getHabitTimeframe(h, routines) === 'Anytime').length +
-            routines.filter(rt => rt.timeBlock === 'Constant').length;
+          const routineMatchesTimeframe = (rt: Routine) => {
+            if (timeframeFilter === 'All') return true;
+            if (timeframeFilter === 'Anytime') return rt.timeBlock === 'Constant';
+            return rt.timeBlock === timeframeFilter;
+          };
 
-          const standaloneHabits = allHabits.filter(h => habitMatchesTimeframe(h));
-          const selectedRoutine = routines.find(rt => rt.id === selectedRoutineSheetId) || null;
+          const allCount = allHabitsFiltered.length + routinesFiltered.length;
+          const morningCount =
+            allHabitsFiltered.filter(h => getHabitTimeframe(h, routines) === 'Morning').length +
+            routinesFiltered.filter(rt => rt.timeBlock === 'Morning').length;
+          const eveningCount =
+            allHabitsFiltered.filter(h => getHabitTimeframe(h, routines) === 'Evening').length +
+            routinesFiltered.filter(rt => rt.timeBlock === 'Evening').length;
+          const nightCount =
+            allHabitsFiltered.filter(h => getHabitTimeframe(h, routines) === 'Night').length +
+            routinesFiltered.filter(rt => rt.timeBlock === 'Night').length;
+          const anytimeCount =
+            allHabitsFiltered.filter(h => getHabitTimeframe(h, routines) === 'Anytime').length +
+            routinesFiltered.filter(rt => rt.timeBlock === 'Constant').length;
+
+          const standaloneHabits = allHabitsFiltered.filter(h => habitMatchesTimeframe(h));
+          const selectedRoutine = routinesFiltered.find(rt => rt.id === selectedRoutineSheetId) || null;
           const selectedRoutineHabits = selectedRoutine
-            ? habits.filter(h => selectedRoutine.habitIds.includes(h.id) && habitMatchesTimeframe(h))
+            ? habits.filter(h => selectedRoutine.habitIds.includes(h.id) && habitMatchesTimeframe(h) && (!selectedPillar || h.category === selectedPillar))
             : [];
 
           const HabitCard = ({ item }: { item: Habit }) => {
@@ -864,15 +891,9 @@ export default function Dashboard({
             );
           };
 
-          const routineMatchesTimeframe = (rt: typeof routines[0]) => {
-            if (timeframeFilter === 'All') return true;
-            if (timeframeFilter === 'Anytime') return rt.timeBlock === 'Constant';
-            return rt.timeBlock === timeframeFilter;
-          };
-
           const totalVisible =
-            routines.filter(routineMatchesTimeframe).reduce((acc, rt) => {
-              const filtered = habits.filter(h => rt.habitIds.includes(h.id));
+            routinesFiltered.filter(routineMatchesTimeframe).reduce((acc, rt) => {
+              const filtered = habits.filter(h => rt.habitIds.includes(h.id) && (!selectedPillar || h.category === selectedPillar));
               return acc + (filtered.length > 0 ? 1 : 0);
             }, 0) + standaloneHabits.length;
 
@@ -911,7 +932,7 @@ export default function Dashboard({
               ) : (
                 <div className="space-y-3.5 md:space-y-3">
                   {/* Routines */}
-                  {routines.filter(routineMatchesTimeframe).map(rt => {
+                  {routinesFiltered.filter(routineMatchesTimeframe).map(rt => {
                     const rtHabits = habits.filter(h => rt.habitIds.includes(h.id));
                     if (rtHabits.length === 0) return null;
                     const doneCount = rtHabits.filter(h => (h.history[dateToday] || 0) >= h.target).length;
@@ -965,7 +986,7 @@ export default function Dashboard({
                   {/* Standalone habits */}
                   {standaloneHabits.length > 0 && (
                     <div className="space-y-2 md:space-y-1.5">
-                      {routines.length > 0 && (
+                      {routinesFiltered.length > 0 && (
                         <div className="text-[11px] md:text-[9px] font-mono text-gray-600 uppercase tracking-widest font-bold px-1 pt-1.5 md:pt-1">
                           Individual Habits
                         </div>

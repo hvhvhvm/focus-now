@@ -1,5 +1,6 @@
 import { Habit, Routine } from './types';
 import { supabase } from './supabase';
+import { mapLegacyCategory } from './data';
 
 export class ApiError extends Error {
   status: number;
@@ -149,7 +150,7 @@ export const api = {
     const baselineHabits = [
       { name: "Power Workout", category: "Fitness", points: 30, type: "Count", target: 1, unit: "workout", repeat: "Daily", enable_focus_timer: false, user_id: uid },
       { name: "Technical Reading", category: "Reading", points: 15, type: "Timer", target: 30, unit: "min", repeat: "Daily", enable_focus_timer: true, user_id: uid },
-      { name: "Mindfulness Breathing", category: "Mindfulness", points: 10, type: "Timer", target: 10, unit: "min", repeat: "Daily", enable_focus_timer: true, user_id: uid }
+      { name: "Mindfulness Breathing", category: "Mindset", points: 10, type: "Timer", target: 10, unit: "min", repeat: "Daily", enable_focus_timer: true, user_id: uid }
     ];
     await supabase.from('habits').insert(baselineHabits);
   },
@@ -174,7 +175,7 @@ export const api = {
       return {
         id: h.id,
         name: h.name,
-        category: h.category,
+        category: mapLegacyCategory(h.category),
         points: h.points,
         type: h.type,
         target: h.target,
