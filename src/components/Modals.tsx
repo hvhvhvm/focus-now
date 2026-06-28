@@ -10,9 +10,10 @@ interface CreateHabitModalProps {
   onSave?: (id: string, habitData: Partial<Habit>) => void;
   habitToEdit?: Habit | null;
   routines: Routine[];
+  prefilledRoutineId?: string;
 }
 
-export function CreateHabitModal({ isOpen, onClose, onCreate, onSave, habitToEdit, routines }: CreateHabitModalProps) {
+export function CreateHabitModal({ isOpen, onClose, onCreate, onSave, habitToEdit, routines, prefilledRoutineId }: CreateHabitModalProps) {
   const [name, setName] = useState('');
   const [category, setCategory] = useState<Category>('Fitness');
   const [points, setPoints] = useState(10);
@@ -57,9 +58,10 @@ export function CreateHabitModal({ isOpen, onClose, onCreate, onSave, habitToEdi
       setRepeat('Daily');
       setTimeBlock('');
       setEnableFocusTimer(false);
-      setRoutineId('');
+      // Pre-fill routineId if provided (e.g., from "Add Habit to Routine" flow)
+      setRoutineId(prefilledRoutineId || '');
     }
-  }, [habitToEdit, isOpen]);
+  }, [habitToEdit, isOpen, prefilledRoutineId]);
 
   const timeBlocks: { id: '' | 'Morning' | 'Evening' | 'Night'; label: string; icon: string }[] = [
     { id: '', label: 'Anytime', icon: '🔄' },
@@ -416,15 +418,35 @@ interface CreateRoutineModalProps {
   isOpen: boolean;
   onClose: () => void;
   onCreate: (routineData: any) => void;
+  onSave?: (id: string, data: { name: string; points: number; timeBlock: 'Morning' | 'Evening' | 'Night' | 'Constant'; repeat: 'Daily' | 'Custom Days' | 'Today Only'; newHabitNames?: string[] }) => void;
+  routineToEdit?: Routine | null;
 }
 
-export function CreateRoutineModal({ isOpen, onClose, onCreate }: CreateRoutineModalProps) {
+export function CreateRoutineModal({ isOpen, onClose, onCreate, onSave, routineToEdit }: CreateRoutineModalProps) {
+  const isEditMode = !!routineToEdit;
   const [name, setName] = useState('');
   const [awardPoints, setAwardPoints] = useState(25);
   const [timeBlock, setTimeBlock] = useState<'Morning' | 'Evening' | 'Night' | 'Constant'>('Morning');
-  const [category, setCategory] = useState<Category>('Health');
+  const [category, setCategory] = useState<Category>('Fitness');
   const [repeat, setRepeat] = useState<'Daily' | 'Custom Days' | 'Today Only'>('Daily');
   const [habitLines, setHabitLines] = useState<string[]>(['']);
+
+  useEffect(() => {
+    if (routineToEdit) {
+      setName(routineToEdit.name || '');
+      setAwardPoints(routineToEdit.points || 25);
+      setTimeBlock(routineToEdit.timeBlock || 'Morning');
+      setRepeat(routineToEdit.repeat || 'Daily');
+      setHabitLines(['']);
+    } else {
+      setName('');
+      setAwardPoints(25);
+      setTimeBlock('Morning');
+      setCategory('Fitness');
+      setRepeat('Daily');
+      setHabitLines(['']);
+    }
+  }, [routineToEdit, isOpen]);
 
   if (!isOpen) return null;
 
@@ -442,14 +464,19 @@ export function CreateRoutineModal({ isOpen, onClose, onCreate }: CreateRoutineM
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
-    const validNames = habitLines.filter((line) => line.trim() !== '');
-    onCreate({ name, points: Number(awardPoints), timeBlock, category, repeat, habitNames: validNames });
-    setName('');
-    setAwardPoints(25);
-    setTimeBlock('Morning');
-    setCategory('Fitness');
-    setRepeat('Daily');
-    setHabitLines(['']);
+    if (isEditMode && routineToEdit && onSave) {
+      const newHabitNames = habitLines.filter((l) => l.trim() !== '');
+      onSave(routineToEdit.id, { name: name.trim(), points: Number(awardPoints), timeBlock, repeat, newHabitNames });
+    } else {
+      const validNames = habitLines.filter((line) => line.trim() !== '');
+      onCreate({ name, points: Number(awardPoints), timeBlock, category, repeat, habitNames: validNames });
+      setName('');
+      setAwardPoints(25);
+      setTimeBlock('Morning');
+      setCategory('Fitness');
+      setRepeat('Daily');
+      setHabitLines(['']);
+    }
   };
 
   const categories: { id: Category; label: string; icon: string; activeClass: string }[] = [
@@ -482,11 +509,11 @@ export function CreateRoutineModal({ isOpen, onClose, onCreate }: CreateRoutineM
         <div className="flex items-center justify-between pb-3 border-b border-[#1A1E29] shrink-0">
           <div>
             <span className="text-[9px] font-mono font-bold tracking-widest text-[#B197FC] uppercase">
-              ROUTINE ARCHITECT
+              {isEditMode ? 'EDIT ROUTINE' : 'ROUTINE ARCHITECT'}
             </span>
             <h3 className="text-lg font-extrabold text-white font-sans mt-0.5 flex items-center">
               <Clipboard className="w-4 h-4 text-purple-400 mr-2" />
-              Build New Routine
+              {isEditMode ? 'Edit Routine' : 'Build New Routine'}
             </h3>
           </div>
           <button
@@ -564,7 +591,8 @@ export function CreateRoutineModal({ isOpen, onClose, onCreate }: CreateRoutineM
             </div>
           </div>
 
-          {/* Category */}
+          {/* Category — only shown when creating */}
+          {!isEditMode && (
           <div>
             <label className="block text-[10px] font-mono font-bold uppercase tracking-wider text-gray-400 mb-1.5">
               Routine Step Category
@@ -587,6 +615,7 @@ export function CreateRoutineModal({ isOpen, onClose, onCreate }: CreateRoutineM
               ))}
             </div>
           </div>
+          )}
 
           {/* Repeat */}
           <div>
@@ -610,6 +639,7 @@ export function CreateRoutineModal({ isOpen, onClose, onCreate }: CreateRoutineM
           </div>
 
           {/* Habit steps */}
+          {!isEditMode ? (
           <div>
             <label className="block text-[10px] font-sans font-extrabold uppercase tracking-wider text-gray-400 mb-1.5">
               Include Habit Steps ({habitLines.filter((h) => h.trim() !== '').length} draft)
@@ -648,6 +678,54 @@ export function CreateRoutineModal({ isOpen, onClose, onCreate }: CreateRoutineM
               <span>Add custom steps to timeline</span>
             </button>
           </div>
+          ) : (
+          // Edit mode — show existing steps count + add new steps
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-[10px] font-sans font-extrabold uppercase tracking-wider text-gray-400">
+                Add New Steps
+              </label>
+              {routineToEdit && routineToEdit.habitIds.length > 0 && (
+                <span className="text-[9px] font-mono text-gray-500 bg-[#1A1D27] border border-[#252A39] px-2 py-0.5 rounded-full">
+                  {routineToEdit.habitIds.length} existing
+                </span>
+              )}
+            </div>
+            <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+              {habitLines.map((line, index) => (
+                <div key={index} className="flex items-center space-x-2">
+                  <div className="w-6 h-6 bg-purple-500/10 border border-purple-500/20 text-purple-400 text-[10px] font-mono font-black flex items-center justify-center rounded-lg shrink-0 flex-shrink-0">
+                    +
+                  </div>
+                  <input
+                    type="text"
+                    placeholder={`e.g. Step ${index + 1} — Push-ups, Read 10 pages…`}
+                    value={line}
+                    onChange={(e) => handleHabitLineChange(index, e.target.value)}
+                    className="flex-1 bg-[#13151D] border border-[#252A39] rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-purple-500 font-sans shadow-inner placeholder-gray-600"
+                  />
+                  {habitLines.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveHabitLine(index)}
+                      className="p-1.5 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={handleAddHabitLine}
+              className="mt-2 w-full flex items-center justify-center py-2 border border-dashed border-purple-500/20 hover:border-purple-500/40 rounded-xl text-[10px] font-bold text-purple-400 hover:bg-purple-500/5 transition cursor-pointer gap-1.5"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Add another step</span>
+            </button>
+          </div>
+          )}
 
           {/* Footer */}
           <div className="flex space-x-2.5 pt-3 border-t border-[#1A1E29] shrink-0 sticky bottom-0 bg-[#0C0E14]">
@@ -662,11 +740,39 @@ export function CreateRoutineModal({ isOpen, onClose, onCreate }: CreateRoutineM
               type="submit"
               className="flex-1 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-400 hover:to-indigo-400 text-[11px] font-extrabold text-white py-2.5 rounded-xl transition cursor-pointer shadow-md uppercase tracking-wider min-h-[44px]"
             >
-              Build Routine ({habitLines.filter((h) => h.trim() !== '').length})
+              {isEditMode
+                ? habitLines.filter((h) => h.trim() !== '').length > 0
+                  ? `Save Changes + Add ${habitLines.filter((h) => h.trim() !== '').length} Step${habitLines.filter((h) => h.trim() !== '').length > 1 ? 's' : ''}`
+                  : 'Save Changes'
+                : `Build Routine (${habitLines.filter((h) => h.trim() !== '').length})`
+              }
             </button>
           </div>
         </form>
       </motion.div>
     </div>
+  );
+}
+
+// ─── EDIT ROUTINE MODAL (kept as alias for backward compatibility) ─────────────
+// The CreateRoutineModal now handles both create and edit modes via routineToEdit prop.
+// This alias allows App.tsx to continue importing EditRoutineModal without breaking changes.
+export function EditRoutineModal({ isOpen, onClose, routine, onSave }: {
+  isOpen: boolean;
+  onClose: () => void;
+  routine: Routine | null;
+  onSave: (id: string, data: { name: string; points: number; timeBlock: 'Morning' | 'Evening' | 'Night' | 'Constant'; newHabitNames?: string[] }) => void;
+}) {
+  const wrappedOnSave = (id: string, data: { name: string; points: number; timeBlock: 'Morning' | 'Evening' | 'Night' | 'Constant'; repeat: 'Daily' | 'Custom Days' | 'Today Only'; newHabitNames?: string[] }) => {
+    onSave(id, { name: data.name, points: data.points, timeBlock: data.timeBlock, newHabitNames: data.newHabitNames });
+  };
+  return (
+    <CreateRoutineModal
+      isOpen={isOpen}
+      onClose={onClose}
+      onCreate={() => {}}
+      onSave={wrappedOnSave}
+      routineToEdit={routine}
+    />
   );
 }

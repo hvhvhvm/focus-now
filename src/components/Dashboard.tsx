@@ -483,6 +483,7 @@ export default function Dashboard({
   const [quickVals, setQuickVals] = useState<{ [key: string]: string }>({});
   const [timeframeFilter, setTimeframeFilter] = useState<'All' | 'Morning' | 'Evening' | 'Night' | 'Anytime'>('All');
   const [selectedRoutineSheetId, setSelectedRoutineSheetId] = useState<string | null>(null);
+  const [showAllRoutines, setShowAllRoutines] = useState(false);
 
   const journeyStartDate = localStorage.getItem('habit_mountain_journey_start_date');
   let activeGrowthValue = 0.0;
@@ -899,28 +900,30 @@ export default function Dashboard({
 
           return (
             <div className="space-y-3">
-              {/* Filter Tabs */}
-              <div className="flex items-center gap-2 md:gap-1.5 border-b border-gray-800/60 pb-3.5 md:pb-3 overflow-x-auto scrollbar-none">
-                {[
-                  { value: 'All', label: 'All', count: allCount, icon: '', activeColor: 'bg-[#12B886]/10 text-[#12B886] border-[#12B886]/20' },
-                  { value: 'Morning', label: 'Morning', count: morningCount, icon: '☀️', activeColor: 'bg-[#FCC419]/10 text-[#FCC419] border-[#FCC419]/30' },
-                  { value: 'Evening', label: 'Evening', count: eveningCount, icon: '🌆', activeColor: 'bg-[#FD7E14]/10 text-[#FD7E14] border-[#FD7E14]/30' },
-                  { value: 'Night', label: 'Night', count: nightCount, icon: '🌙', activeColor: 'bg-[#845EF7]/10 text-[#845EF7] border-[#845EF7]/30' },
-                  { value: 'Anytime', label: 'Anytime', count: anytimeCount, icon: '🔄', activeColor: 'bg-[#20C997]/10 text-[#20C997] border-[#20C997]/30' },
-                ].map(tab => {
-                  const isActive = timeframeFilter === tab.value;
-                  return (
-                    <button key={tab.value} onClick={() => setTimeframeFilter(tab.value as any)}
-                      className={`flex items-center gap-1.5 md:gap-1 px-3.5 py-2 md:px-2.5 md:py-1 rounded-full text-[13px] md:text-[11px] font-semibold cursor-pointer transition select-none shrink-0 ${
-                        isActive ? 'border ' + tab.activeColor : 'bg-[#12141C] border border-[#232734] text-gray-400 hover:text-white hover:bg-[#1E212E]'
-                      }`}>
-                      {tab.icon && <span className="text-[13px] md:text-[11px]">{tab.icon}</span>}
-                      <span>{tab.label}</span>
-                      <span className="text-[11px] md:text-[9px] font-mono font-extrabold bg-[#1A1D28] text-gray-500 border border-gray-800 px-1.5 md:px-1 rounded">{tab.count}</span>
-                    </button>
-                  );
-                })}
-              </div>
+              {/* Filter Tabs — hidden when a pillar is selected */}
+              {!selectedPillar && (
+                <div className="flex items-center gap-2 md:gap-1.5 border-b border-gray-800/60 pb-3.5 md:pb-3 overflow-x-auto scrollbar-none">
+                  {[
+                    { value: 'All', label: 'All', count: allCount, icon: '', activeColor: 'bg-[#12B886]/10 text-[#12B886] border-[#12B886]/20' },
+                    { value: 'Morning', label: 'Morning', count: morningCount, icon: '☀️', activeColor: 'bg-[#FCC419]/10 text-[#FCC419] border-[#FCC419]/30' },
+                    { value: 'Evening', label: 'Evening', count: eveningCount, icon: '🌆', activeColor: 'bg-[#FD7E14]/10 text-[#FD7E14] border-[#FD7E14]/30' },
+                    { value: 'Night', label: 'Night', count: nightCount, icon: '🌙', activeColor: 'bg-[#845EF7]/10 text-[#845EF7] border-[#845EF7]/30' },
+                    { value: 'Anytime', label: 'Anytime', count: anytimeCount, icon: '🔄', activeColor: 'bg-[#20C997]/10 text-[#20C997] border-[#20C997]/30' },
+                  ].map(tab => {
+                    const isActive = timeframeFilter === tab.value;
+                    return (
+                      <button key={tab.value} onClick={() => setTimeframeFilter(tab.value as any)}
+                        className={`flex items-center gap-1.5 md:gap-1 px-3.5 py-2 md:px-2.5 md:py-1 rounded-full text-[13px] md:text-[11px] font-semibold cursor-pointer transition select-none shrink-0 ${
+                          isActive ? 'border ' + tab.activeColor : 'bg-[#12141C] border border-[#232734] text-gray-400 hover:text-white hover:bg-[#1E212E]'
+                        }`}>
+                        {tab.icon && <span className="text-[13px] md:text-[11px]">{tab.icon}</span>}
+                        <span>{tab.label}</span>
+                        <span className="text-[11px] md:text-[9px] font-mono font-extrabold bg-[#1A1D28] text-gray-500 border border-gray-800 px-1.5 md:px-1 rounded">{tab.count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* Habit List */}
               {totalVisible === 0 ? (
@@ -932,56 +935,83 @@ export default function Dashboard({
               ) : (
                 <div className="space-y-3.5 md:space-y-3">
                   {/* Routines */}
-                  {routinesFiltered.filter(routineMatchesTimeframe).map(rt => {
-                    const rtHabits = habits.filter(h => rt.habitIds.includes(h.id));
-                    if (rtHabits.length === 0) return null;
-                    const doneCount = rtHabits.filter(h => (h.history[dateToday] || 0) >= h.target).length;
-                    const totalCount = rtHabits.length;
-                    const rtProgress = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
-                    const allDone = totalCount > 0 && doneCount === totalCount;
+                  {(() => {
+                    const allFilteredRoutines = routinesFiltered.filter(routineMatchesTimeframe);
+                    const visibleRoutines = showAllRoutines ? allFilteredRoutines : allFilteredRoutines.slice(0, 3);
+                    const hasMore = allFilteredRoutines.length > 3;
                     return (
-                      <button key={rt.id} type="button" onClick={() => setSelectedRoutineSheetId(rt.id)}
-                        aria-label={`Open ${rt.name} routine`}
-                        className={`w-full rounded-xl border text-left overflow-hidden bg-[#0F1018] hover:bg-[#151826] transition-all duration-200 cursor-pointer select-none shadow-sm active:scale-[0.99] ${
-                          allDone ? 'border-[#12B886]/25' : 'border-[#845EF7]/20 hover:border-[#845EF7]/40'
-                        }`}>
-                        <div className="flex items-center gap-3 md:gap-2.5 px-3.5 md:px-3 py-3 md:py-2.5">
-                          <div className="w-1 h-8 md:h-7 rounded-full bg-[#845EF7] shrink-0" />
-                          <div className="h-10 w-10 md:h-8 md:w-8 rounded-full border border-[#845EF7]/20 bg-[#845EF7]/10 text-[#B197FC] flex items-center justify-center shrink-0">
-                            <Navigation className="w-4.5 h-4.5 md:w-3.5 md:h-3.5" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 md:gap-1.5">
-                              <span className="text-[14px] md:text-[12px] font-bold text-white truncate">{rt.name}</span>
-                              {rt.timeBlock && (
-                                <span className="text-[10px] md:text-[8px] font-mono text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 md:px-1.5 rounded uppercase tracking-wider shrink-0">
-                                  {rt.timeBlock}
-                                </span>
-                              )}
-                              {allDone && (
-                                <span className="text-[10px] md:text-[8px] font-mono text-[#12B886] bg-[#12B886]/10 border border-[#12B886]/20 px-2 py-0.5 md:px-1.5 rounded uppercase tracking-wider shrink-0">
-                                  Done
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2 md:gap-1.5 mt-1.5 md:mt-1">
-                              <div className="flex-1 h-1.5 md:h-1 bg-gray-800 rounded-full overflow-hidden">
-                                <div className="h-full rounded-full bg-gradient-to-r from-purple-500 to-indigo-400 transition-all duration-500"
-                                  style={{ width: `${rtProgress}%`, boxShadow: '0 0 4px #845EF7' }} />
+                      <>
+                        {visibleRoutines.map(rt => {
+                          const rtHabits = habits.filter(h => rt.habitIds.includes(h.id));
+                          if (rtHabits.length === 0) return null;
+                          const doneCount = rtHabits.filter(h => (h.history[dateToday] || 0) >= h.target).length;
+                          const totalCount = rtHabits.length;
+                          const rtProgress = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
+                          const allDone = totalCount > 0 && doneCount === totalCount;
+                          return (
+                            <button key={rt.id} type="button" onClick={() => setSelectedRoutineSheetId(rt.id)}
+                              aria-label={`Open ${rt.name} routine`}
+                              className={`w-full rounded-xl border text-left overflow-hidden bg-[#0F1018] hover:bg-[#151826] transition-all duration-200 cursor-pointer select-none shadow-sm active:scale-[0.99] ${
+                                allDone ? 'border-[#12B886]/25' : 'border-[#845EF7]/20 hover:border-[#845EF7]/40'
+                              }`}>
+                              <div className="flex items-center gap-3 md:gap-2.5 px-3.5 md:px-3 py-3 md:py-2.5">
+                                <div className="w-1 h-8 md:h-7 rounded-full bg-[#845EF7] shrink-0" />
+                                <div className="h-10 w-10 md:h-8 md:w-8 rounded-full border border-[#845EF7]/20 bg-[#845EF7]/10 text-[#B197FC] flex items-center justify-center shrink-0">
+                                  <Navigation className="w-4.5 h-4.5 md:w-3.5 md:h-3.5" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 md:gap-1.5">
+                                    <span className="text-[14px] md:text-[12px] font-bold text-white truncate">{rt.name}</span>
+                                    {rt.timeBlock && (
+                                      <span className="text-[10px] md:text-[8px] font-mono text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 md:px-1.5 rounded uppercase tracking-wider shrink-0">
+                                        {rt.timeBlock}
+                                      </span>
+                                    )}
+                                    {allDone && (
+                                      <span className="text-[10px] md:text-[8px] font-mono text-[#12B886] bg-[#12B886]/10 border border-[#12B886]/20 px-2 py-0.5 md:px-1.5 rounded uppercase tracking-wider shrink-0">
+                                        Done
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2 md:gap-1.5 mt-1.5 md:mt-1">
+                                    <div className="flex-1 h-1.5 md:h-1 bg-gray-800 rounded-full overflow-hidden">
+                                      <div className="h-full rounded-full bg-gradient-to-r from-purple-500 to-indigo-400 transition-all duration-500"
+                                        style={{ width: `${rtProgress}%`, boxShadow: '0 0 4px #845EF7' }} />
+                                    </div>
+                                    <span className="text-[11px] md:text-[9px] font-mono text-purple-400 shrink-0">{doneCount}/{totalCount}</span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2 md:gap-1.5 shrink-0">
+                                  <span className="text-[11px] md:text-[9px] font-mono font-bold text-[#FCC419] bg-[#FCC419]/10 border border-[#FCC419]/20 px-2 py-1 md:px-1.5 md:py-0.5 rounded">
+                                    +{rt.points}XP
+                                  </span>
+                                  <ChevronRight className="w-4.5 h-4.5 md:w-3.5 md:h-3.5 text-gray-500" />
+                                </div>
                               </div>
-                              <span className="text-[11px] md:text-[9px] font-mono text-purple-400 shrink-0">{doneCount}/{totalCount}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2 md:gap-1.5 shrink-0">
-                            <span className="text-[11px] md:text-[9px] font-mono font-bold text-[#FCC419] bg-[#FCC419]/10 border border-[#FCC419]/20 px-2 py-1 md:px-1.5 md:py-0.5 rounded">
-                              +{rt.points}XP
-                            </span>
-                            <ChevronRight className="w-4.5 h-4.5 md:w-3.5 md:h-3.5 text-gray-500" />
-                          </div>
-                        </div>
-                      </button>
+                            </button>
+                          );
+                        })}
+                        {hasMore && !showAllRoutines && (
+                          <button
+                            type="button"
+                            onClick={() => setShowAllRoutines(true)}
+                            className="w-full py-2.5 rounded-xl border border-dashed border-[#845EF7]/20 text-[12px] md:text-[11px] font-semibold text-purple-400 hover:bg-[#845EF7]/5 hover:border-[#845EF7]/40 transition cursor-pointer select-none"
+                          >
+                            View all {allFilteredRoutines.length} routines →
+                          </button>
+                        )}
+                        {showAllRoutines && allFilteredRoutines.length > 3 && (
+                          <button
+                            type="button"
+                            onClick={() => setShowAllRoutines(false)}
+                            className="w-full py-2.5 rounded-xl border border-dashed border-gray-800 text-[12px] md:text-[11px] font-semibold text-gray-500 hover:text-gray-300 hover:bg-gray-800/20 transition cursor-pointer select-none"
+                          >
+                            Show less
+                          </button>
+                        )}
+                      </>
                     );
-                  })}
+                  })()}
 
                   {/* Standalone habits */}
                   {standaloneHabits.length > 0 && (

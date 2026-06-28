@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
   Zap, Clock, Repeat, Plus, Check, Play, Pause, RotateCcw,
   ChevronLeft, MoreVertical, Trash2, Pencil, Undo2,
-  Dumbbell, BookOpen, Heart, Brain, Navigation, Sparkles, CalendarDays,
-  Target, Moon
+  Dumbbell, BookOpen, Heart, Brain, Sparkles, CalendarDays,
+  Target, Moon, ListChecks, CheckCircle2, TrendingUp, FlameKindling
 } from 'lucide-react';
 import { Habit, Category, Routine } from '../types';
 import { dateToday, isHabitScheduledForDate, formatDateString, getStandaloneHabits } from '../data';
@@ -59,6 +59,9 @@ interface HabitsPageProps {
   openCreateRoutine: () => void;
   onEditHabit: (habit: Habit) => void;
   onRevertHabit: (id: string) => void;
+  onEditRoutine: (routine: Routine) => void;
+  onDeleteRoutine: (routineId: string) => void;
+  onAddHabitToRoutine: (routineId: string) => void;
   selectedRoutineId: string | null;
   setSelectedRoutineId: (id: string | null) => void;
   selectedCategoryId: Category | null;
@@ -68,6 +71,7 @@ interface HabitsPageProps {
 export default function HabitsPage({
   habits, routines, onLogHabit, onDeleteHabit, deletingHabitId,
   openCreateHabit, openCreateRoutine, onEditHabit, onRevertHabit,
+  onEditRoutine, onDeleteRoutine, onAddHabitToRoutine,
   selectedRoutineId, setSelectedRoutineId, selectedCategoryId, setSelectedCategoryId,
 }: HabitsPageProps) {
   const toast = useToast();
@@ -145,104 +149,311 @@ export default function HabitsPage({
     if (!rt) { setSelectedRoutineId(null); return null; }
     const rh = habits.filter(h => rt.habitIds.includes(h.id));
     const doneInRt = rh.filter(h => (h.history[dateToday]||0) >= h.target).length;
+    const allDone = rh.length > 0 && doneInRt === rh.length;
+    const progressPct = rh.length > 0 ? Math.round((doneInRt / rh.length) * 100) : 0;
+
+    // 7-day consistency
+    let consistency7 = 0;
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      if (rt.completedHistory?.[formatDateString(d)]) consistency7++;
+    }
+
+    const timeBlockColors: Record<string, { bg: string; text: string; border: string; glow: string }> = {
+      Morning: { bg: 'bg-amber-500/10',  text: 'text-amber-300',  border: 'border-amber-500/25',  glow: '#F59E0B' },
+      Evening: { bg: 'bg-orange-500/10', text: 'text-orange-300', border: 'border-orange-500/25', glow: '#F97316' },
+      Night:   { bg: 'bg-indigo-500/10', text: 'text-indigo-300', border: 'border-indigo-500/25', glow: '#6366F1' },
+      Constant:{ bg: 'bg-emerald-500/10',text: 'text-emerald-300',border: 'border-emerald-500/25',glow: '#10B981' },
+    };
+    const tbColor = timeBlockColors[rt.timeBlock] ?? { bg: 'bg-purple-500/10', text: 'text-purple-300', border: 'border-purple-500/25', glow: '#8B5CF6' };
 
     return (
-      <div className="max-w-3xl mx-auto space-y-6 p-4 md:p-0">
+      <div className="max-w-3xl mx-auto space-y-5 p-4 md:p-0">
+        {/* Back button */}
         <button onClick={() => setSelectedRoutineId(null)}
-          className="flex items-center text-sm font-semibold text-gray-400 hover:text-white transition cursor-pointer">
-          <ChevronLeft className="w-4 h-4 mr-1" /> Back to Routines
+          className="flex items-center gap-1.5 text-sm font-semibold text-gray-400 hover:text-white transition cursor-pointer group">
+          <ChevronLeft className="w-4 h-4 group-hover:-translate-x-0.5 transition-transform" /> Back to Routines
         </button>
 
-        <div className="bg-[#12141A] border border-[#222631] rounded-2xl p-6 shadow-xl relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-24 h-24 bg-purple-500/5 rounded-bl-full blur-xl" />
-          <div className="flex items-start justify-between">
-            <div>
-              <span className="text-[10px] font-mono tracking-widest text-purple-400 font-bold bg-purple-500/10 border border-purple-500/20 px-2.5 py-0.5 rounded uppercase">
-                {rt.timeBlock} Block
-              </span>
-              <h2 className="text-2xl font-extrabold text-white mt-2.5">{rt.name}</h2>
-            </div>
-            <div className="text-right">
-              <span className="text-xs text-gray-500 font-mono block">ROUTINE AWARD</span>
-              <span className="text-lg font-bold text-[#FCC419] flex items-center gap-1">
-                <Zap className="w-4 h-4 fill-[#FCC419]" /> {rt.points} pts
-              </span>
-            </div>
-          </div>
+        {/* ── Hero Header ── */}
+        <div className="relative bg-gradient-to-br from-[#13151E] to-[#0E101A] border border-[#222631] rounded-2xl p-6 shadow-2xl overflow-hidden">
+          {/* Ambient glow */}
+          <div className="absolute top-0 right-0 w-40 h-40 rounded-full blur-3xl opacity-20 pointer-events-none"
+            style={{ background: tbColor.glow }} />
+          <div className="absolute bottom-0 left-0 w-24 h-24 rounded-full blur-2xl opacity-10 pointer-events-none"
+            style={{ background: tbColor.glow }} />
 
-          <div className="mt-6 grid grid-cols-2 gap-4 border-t border-[#1C1F2B] pt-5">
-            <div>
-              <span className="text-[10px] font-mono text-gray-500 uppercase block">7-Day Consistency</span>
-              {(() => {
-                let completed = 0;
-                for (let i = 0; i < 7; i++) {
-                  const d = new Date(); d.setDate(d.getDate() - i);
-                  if (rt.completedHistory?.[formatDateString(d)]) completed++;
-                }
-                return <span className="text-2xl font-black text-white font-mono">{Math.round((completed/7)*100)}%</span>;
-              })()}
+          <div className="relative">
+            {/* Time block badge + routine name */}
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex-1">
+                <span className={`inline-flex items-center gap-1.5 text-[10px] font-mono tracking-widest font-bold ${tbColor.bg} ${tbColor.border} ${tbColor.text} border px-2.5 py-0.5 rounded-full uppercase`}>
+                  <span>{
+                    rt.timeBlock === 'Morning' ? '☀️' :
+                    rt.timeBlock === 'Evening' ? '🌇' :
+                    rt.timeBlock === 'Night'   ? '🌙' : '🔄'
+                  }</span>
+                  {rt.timeBlock} Block
+                </span>
+                <h2 className="text-2xl font-extrabold text-white mt-2 leading-tight">{rt.name}</h2>
+                <p className="text-xs text-gray-500 mt-1 flex items-center gap-2">
+                  <Repeat className="w-3 h-3" />
+                  {rt.repeat} · {rh.length} habit{rh.length !== 1 ? 's' : ''}
+                </p>
+              </div>
+              {/* Points badge */}
+              <div className="shrink-0 flex flex-col items-end gap-3">
+                <div className="bg-[#FCC419]/10 border border-[#FCC419]/25 rounded-xl px-3 py-2 text-center">
+                  <span className="text-[9px] font-mono text-gray-500 uppercase block">Bonus Award</span>
+                  <span className="text-lg font-black text-[#FCC419] flex items-center gap-1 justify-center">
+                    <Zap className="w-4 h-4 fill-[#FCC419]" /> {rt.points} pts
+                  </span>
+                </div>
+              </div>
             </div>
-            <div>
-              <span className="text-[10px] font-mono text-gray-500 uppercase block">Today's Progress</span>
-              <span className="text-2xl font-black text-[#12B886] font-mono">{doneInRt}/{rh.length} Done</span>
+
+            {/* Big Progress Arc + Stats */}
+            <div className="mt-5 pt-5 border-t border-[#1C1F2B] grid grid-cols-3 gap-4">
+              <div className="col-span-2">
+                <div className="flex items-baseline gap-2 mb-2">
+                  <span className="text-3xl font-black text-white font-mono">{progressPct}%</span>
+                  <span className="text-xs text-gray-500">today</span>
+                </div>
+                <div className="w-full h-2.5 bg-[#171924] rounded-full overflow-hidden border border-[#1E2130]">
+                  <div
+                    className={`h-full rounded-full transition-all duration-700 ${
+                      allDone
+                        ? 'bg-gradient-to-r from-emerald-400 to-teal-400'
+                        : 'bg-gradient-to-r from-purple-500 to-indigo-500'
+                    }`}
+                    style={{ width: `${progressPct}%` }}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1.5 font-mono">{doneInRt} of {rh.length} habits complete</p>
+              </div>
+              <div className="text-right">
+                <span className="text-[9px] font-mono text-gray-500 uppercase block mb-1">7-Day Streak</span>
+                <span className="text-2xl font-black text-white font-mono">{consistency7}<span className="text-sm text-gray-500">/7</span></span>
+                <div className="flex gap-1 justify-end mt-1.5">
+                  {Array.from({ length: 7 }, (_, i) => {
+                    const d = new Date(); d.setDate(d.getDate() - (6 - i));
+                    const hit = rt.completedHistory?.[formatDateString(d)];
+                    return (
+                      <div key={i} className={`w-2.5 h-2.5 rounded-sm ${ hit ? 'bg-emerald-400' : 'bg-[#1E2130]' }`} />
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="bg-[#12141A] border border-[#222631] rounded-2xl p-6 shadow-xl">
-          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-6">Routine Steps</h3>
-          <div className="space-y-6 relative pl-8 border-l-2 border-[#1E2332]">
-            {rh.map((item, idx) => {
-              const val  = item.history[dateToday] || 0;
-              const done = val >= item.target;
-              const rem  = Math.max(0, item.target - val);
-              const cfg  = getCatConfig(item.category);
-              return (
-                <div key={item.id} className="relative group">
-                  <div className={`absolute -left-[41px] top-1.5 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all ${
-                    done ? 'bg-emerald-500 border-transparent text-white' : 'bg-[#12141D] border-[#2E3547] text-gray-500'
+        {/* ── Action Bar ── */}
+        <div className="flex flex-wrap gap-2">
+          {/* Complete Entire Routine */}
+          {!allDone && rh.length > 0 && (
+            <button
+              type="button"
+              onClick={() => rh.filter(h => (h.history[dateToday]||0) < h.target).forEach(h => onLogHabit(h.id, Math.max(0, h.target - (h.history[dateToday]||0))))}
+              className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-extrabold text-xs px-4 py-3 rounded-xl cursor-pointer transition shadow-lg shadow-emerald-500/20 active:scale-95 min-h-[44px]"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              Complete All Habits
+              <span className="text-[10px] opacity-75 font-mono">({rh.length - doneInRt} left)</span>
+            </button>
+          )}
+          {allDone && rh.length > 0 && (
+            <div className="flex-1 flex items-center justify-center gap-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-extrabold text-xs px-4 py-3 rounded-xl min-h-[44px]">
+              <Check className="w-4 h-4 stroke-[3px]" />
+              Routine Complete! 🎉
+            </div>
+          )}
+          {/* Add Habit */}
+          <button
+            type="button"
+            onClick={() => onAddHabitToRoutine(rt.id)}
+            className="flex items-center gap-2 bg-[#1A1D2A] hover:bg-[#22263A] border border-purple-500/25 hover:border-purple-500/50 text-purple-400 font-bold text-xs px-4 py-3 rounded-xl cursor-pointer transition active:scale-95 min-h-[44px]"
+          >
+            <Plus className="w-4 h-4" /> Add Habit
+          </button>
+          {/* Edit Routine */}
+          <button
+            type="button"
+            onClick={() => onEditRoutine(rt)}
+            className="flex items-center gap-2 bg-[#1A1D2A] hover:bg-[#22263A] border border-[#2A2F40] hover:border-gray-600 text-gray-300 font-bold text-xs px-4 py-3 rounded-xl cursor-pointer transition active:scale-95 min-h-[44px]"
+          >
+            <Pencil className="w-3.5 h-3.5" /> Edit
+          </button>
+          {/* Delete Routine */}
+          <button
+            type="button"
+            onClick={() => onDeleteRoutine(rt.id)}
+            className="flex items-center gap-2 bg-red-500/8 hover:bg-red-500/15 border border-red-500/25 hover:border-red-500/40 text-red-400 font-bold text-xs px-4 py-3 rounded-xl cursor-pointer transition active:scale-95 min-h-[44px]"
+          >
+            <Trash2 className="w-3.5 h-3.5" /> Delete Routine
+          </button>
+        </div>
+
+        {/* ── Habit Steps ── */}
+        <div className="bg-[#12141A] border border-[#222631] rounded-2xl shadow-xl overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-[#1C1F2B]">
+            <div className="flex items-center gap-2">
+              <ListChecks className="w-4 h-4 text-purple-400" />
+              <h3 className="text-sm font-bold text-white">Routine Steps</h3>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-mono text-gray-500 bg-[#1A1D25] border border-[#252A38] px-2.5 py-0.5 rounded-full">
+                {doneInRt}/{rh.length} done
+              </span>
+            </div>
+          </div>
+
+          {rh.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-14 text-center">
+              <div className="w-14 h-14 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center mb-4">
+                <Plus className="w-6 h-6 text-purple-400" />
+              </div>
+              <p className="text-sm font-bold text-gray-300">No habits in this routine yet</p>
+              <p className="text-xs text-gray-500 mt-1 mb-4">Add your first habit to get started</p>
+              <button
+                type="button"
+                onClick={() => onAddHabitToRoutine(rt.id)}
+                className="flex items-center gap-2 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 font-bold text-xs px-4 py-2.5 rounded-xl cursor-pointer transition"
+              >
+                <Plus className="w-4 h-4" /> Add First Habit
+              </button>
+            </div>
+          ) : (
+            <div className="divide-y divide-[#1C1F2B]">
+              {rh.map((item, idx) => {
+                const val  = item.history[dateToday] || 0;
+                const pct  = Math.min(100, Math.round((val / item.target) * 100));
+                const done = val >= item.target;
+                const rem  = Math.max(0, item.target - val);
+                const cfg  = getCatConfig(item.category);
+                return (
+                  <div key={item.id} className={`group relative overflow-hidden transition-all duration-200 ${
+                    done ? 'bg-emerald-500/5' : 'hover:bg-[#161922]'
                   }`}>
-                    {done ? <Check className="w-3.5 h-3.5" /> : <span className="text-[10px] font-mono font-bold">{idx+1}</span>}
-                  </div>
-                  <div className="bg-[#1A1C24] border border-[#272B36] hover:border-purple-500/20 rounded-xl p-4 transition flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                      <div className="flex items-center space-x-2">
-                        <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded font-bold border"
-                          style={{ color: cfg.color, borderColor: `${cfg.color}25`, background: `${cfg.color}10` }}>
-                          {item.category}
-                        </span>
-                        {done && <span className="text-[9px] text-emerald-400 font-bold uppercase bg-emerald-500/10 px-1.5 rounded border border-emerald-500/25">Done</span>}
+                    {/* Progress fill */}
+                    <div
+                      className={`absolute inset-y-0 left-0 transition-all duration-700 pointer-events-none ${
+                        done ? 'opacity-60' : 'opacity-40'
+                      }`}
+                      style={{
+                        width: `${pct}%`,
+                        background: done
+                          ? 'linear-gradient(90deg, rgba(16,185,129,0.08), transparent)'
+                          : `linear-gradient(90deg, ${cfg.color}10, transparent)`
+                      }}
+                    />
+                    <div className="relative flex items-center gap-3 px-5 py-4">
+                      {/* Step circle */}
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 font-black text-xs font-mono transition-all ${
+                        done
+                          ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/25'
+                          : 'bg-[#12141D] border-2 border-[#2E3547] text-gray-500'
+                      }`}>
+                        {done ? <Check className="w-3.5 h-3.5" /> : <span>{idx + 1}</span>}
                       </div>
-                      <h4 className="text-base font-bold text-white mt-1.5">{item.name}</h4>
-                      <p className="text-xs text-gray-500 mt-0.5">{rem} {item.unit} remaining of {item.target}</p>
-                    </div>
-                    <div className="flex items-center space-x-2 shrink-0">
-                      <button onClick={() => onDeleteHabit(item.id)} disabled={!!deletingHabitId}
-                        className="text-gray-500 hover:text-red-400 p-2 rounded-lg hover:bg-red-500/10 transition cursor-pointer">
-                        {deletingHabitId === item.id ? <RotateCcw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                      </button>
-                      {!done ? (
-                        <>
-                          <button onClick={() => onLogHabit(item.id, Math.ceil(item.target/3))}
-                            className="bg-[#21242E] hover:bg-[#2C3140] text-xs font-bold text-gray-200 px-3.5 py-2 rounded-lg cursor-pointer transition">
-                            +{Math.ceil(item.target/3)}
-                          </button>
-                          <button onClick={() => onLogHabit(item.id, rem)}
-                            className="bg-[#12B886]/12 hover:bg-[#12B886]/25 border border-[#12B886]/25 text-xs font-bold text-[#12B886] px-4 py-2 rounded-lg cursor-pointer transition">
-                            Mark Complete
-                          </button>
-                        </>
-                      ) : (
-                        <button onClick={() => onRevertHabit(item.id)}
-                          className="bg-amber-500/10 border border-amber-500/25 text-xs font-bold text-amber-400 px-3 py-2 rounded-lg cursor-pointer transition flex items-center gap-1">
-                          <Undo2 className="w-3.5 h-3.5" /> Revert
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded font-bold border"
+                            style={{ color: cfg.color, borderColor: `${cfg.color}30`, background: `${cfg.color}12` }}>
+                            {item.category}
+                          </span>
+                          {done ? (
+                            <span className="text-[9px] text-emerald-400 font-bold uppercase bg-emerald-500/10 px-1.5 rounded border border-emerald-500/25">
+                              ✓ Done
+                            </span>
+                          ) : pct > 0 ? (
+                            <span className="text-[9px] text-purple-400 font-mono">{pct}%</span>
+                          ) : null}
+                        </div>
+                        <h4 className={`text-sm font-bold leading-snug ${ done ? 'text-emerald-300 line-through decoration-emerald-500/40' : 'text-white' }`}>
+                          {item.name}
+                        </h4>
+                        {!done && (
+                          <div className="flex items-center gap-2 mt-1.5">
+                            <div className="h-1 bg-[#1E2130] rounded-full overflow-hidden flex-1 max-w-[120px]">
+                              <div className="h-full rounded-full transition-all duration-500"
+                                style={{ width: `${pct}%`, background: cfg.color }} />
+                            </div>
+                            <span className="text-[10px] text-gray-600 font-mono">{rem} {item.unit} left</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action buttons */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {/* Delete habit (always visible on hover) */}
+                        <button
+                          type="button"
+                          onClick={() => onDeleteHabit(item.id)}
+                          disabled={!!deletingHabitId}
+                          className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition cursor-pointer disabled:opacity-30"
+                          title="Delete habit"
+                        >
+                          {deletingHabitId === item.id
+                            ? <RotateCcw className="w-3.5 h-3.5 animate-spin" />
+                            : <Trash2 className="w-3.5 h-3.5" />
+                          }
                         </button>
-                      )}
+                        {/* Edit habit */}
+                        <button
+                          type="button"
+                          onClick={() => onEditHabit(item)}
+                          className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-gray-600 hover:text-purple-400 hover:bg-purple-500/10 transition cursor-pointer"
+                          title="Edit habit"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        {!done ? (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => onLogHabit(item.id, Math.ceil(item.target / 3))}
+                              className="bg-[#1E2130] hover:bg-[#252A3C] border border-[#2A3040] text-gray-300 text-[11px] font-bold px-2.5 py-1.5 rounded-lg cursor-pointer transition font-mono"
+                            >
+                              +{Math.ceil(item.target / 3)}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => onLogHabit(item.id, rem)}
+                              className="bg-emerald-500/12 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 text-[11px] font-bold px-3 py-1.5 rounded-lg cursor-pointer transition whitespace-nowrap"
+                            >
+                              Done ✓
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => onRevertHabit(item.id)}
+                            className="bg-amber-500/10 border border-amber-500/25 text-amber-400 text-[11px] font-bold px-2.5 py-1.5 rounded-lg cursor-pointer transition flex items-center gap-1"
+                          >
+                            <Undo2 className="w-3 h-3" /> Undo
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+          )}
+
+          {/* Footer: Add Habit to Routine */}
+          <div className="px-5 py-4 border-t border-[#1C1F2B]">
+            <button
+              type="button"
+              onClick={() => onAddHabitToRoutine(rt.id)}
+              className="w-full flex items-center justify-center gap-2 py-2.5 border border-dashed border-purple-500/25 hover:border-purple-500/50 rounded-xl text-[11px] font-bold text-purple-400 hover:bg-purple-500/5 transition cursor-pointer active:scale-[0.98]"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Add Habit to this Routine
+            </button>
           </div>
         </div>
       </div>

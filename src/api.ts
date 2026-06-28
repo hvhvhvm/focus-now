@@ -407,6 +407,21 @@ export const api = {
     if (error) throw new ApiError(error.message, 500);
   },
 
+  async updateRoutine(routineId: string, rtData: {
+    name?: string;
+    points?: number;
+    timeBlock?: 'Morning' | 'Evening' | 'Night' | 'Constant';
+    repeat?: 'Daily' | 'Custom Days' | 'Today Only';
+  }): Promise<void> {
+    const payload: any = {};
+    if (rtData.name !== undefined) payload.name = rtData.name;
+    if (rtData.points !== undefined) payload.points = rtData.points;
+    if (rtData.timeBlock !== undefined) payload.time_block = rtData.timeBlock;
+    if (rtData.repeat !== undefined) payload.repeat = rtData.repeat;
+    const { error } = await supabase.from('routines').update(payload).eq('id', routineId);
+    if (error) throw new ApiError(error.message, 500);
+  },
+
   async deleteRoutine(routineId: string) {
     const { error } = await supabase.from('routines').delete().eq('id', routineId);
     if (error) throw new ApiError(error.message, 500);

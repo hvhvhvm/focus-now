@@ -8,7 +8,7 @@ import OnePercentBetterPage from './components/OnePercentBetterPage';
 import InsightsPage from './components/InsightsPage';
 import ProfilePage from './components/ProfilePage';
 import AuthPage from './components/AuthPage';
-import { CreateHabitModal, CreateRoutineModal } from './components/Modals';
+import { CreateHabitModal, CreateRoutineModal, EditRoutineModal } from './components/Modals';
 import { ToastProvider, useToast, ConfirmDialog } from './components/Toast';
 import { Habit, Category, Routine } from './types';
 import { calculateMomentum, dateToday, calculateTotalEarnedPoints, getScheduledHabits } from './data';
@@ -63,8 +63,11 @@ function AppInner() {
   // State for Create dialogue modals
   const [isHabitModalOpen, setIsHabitModalOpen] = useState(false);
   const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false);
+  const [isEditRoutineModalOpen, setIsEditRoutineModalOpen] = useState(false);
   const [habitToEdit, setHabitToEdit] = useState<Habit | null>(null);
+  const [routineToEdit, setRoutineToEdit] = useState<any | null>(null);
   const [deletingHabitId, setDeletingHabitId] = useState<string | null>(null);
+  const [prefilledRoutineId, setPrefilledRoutineId] = useState<string | undefined>(undefined);
 
   // Fetch all user details, habits, routines on mounting/authentication
   const loadAllData = async () => {
@@ -248,10 +251,19 @@ function AppInner() {
   const closeHabitModal = () => {
     setIsHabitModalOpen(false);
     setHabitToEdit(null);
+    setPrefilledRoutineId(undefined);
   };
 
   const openCreateHabit = () => {
     setHabitToEdit(null);
+    setPrefilledRoutineId(undefined);
+    setIsHabitModalOpen(true);
+  };
+
+  // Open the create habit modal pre-linked to a specific routine
+  const openAddHabitToRoutine = (routineId: string) => {
+    setHabitToEdit(null);
+    setPrefilledRoutineId(routineId);
     setIsHabitModalOpen(true);
   };
 
@@ -363,6 +375,74 @@ function AppInner() {
   const handleNavigateToRoutine = (routineId: string) => {
     setSelectedRoutineId(routineId);
     setTab('habits');
+  };
+
+  // Handler: Open routine edit modal
+  const handleOpenEditRoutine = (routine: any) => {
+    setRoutineToEdit(routine);
+    setIsEditRoutineModalOpen(true);
+  };
+
+  // Handler: Save routine edits
+  const handleUpdateRoutineSubmit = async (id: string, data: { name: string; points: number; timeBlock: 'Morning' | 'Evening' | 'Night' | 'Constant'; repeat?: 'Daily' | 'Custom Days' | 'Today Only'; newHabitNames?: string[] }) => {
+    try {
+      await api.updateRoutine(id, data);
+
+      // If new habit step names were added, create them and link to this routine
+      if (data.newHabitNames && data.newHabitNames.length > 0) {
+        const routine = routines.find(r => r.id === id);
+        for (const habitName of data.newHabitNames) {
+          if (!habitName.trim()) continue;
+          await api.createHabit({
+            name: habitName.trim(),
+            category: 'Fitness',
+            points: 10,
+            type: 'Count',
+            target: 10,
+            unit: 'reps',
+            repeat: data.repeat || routine?.repeat || 'Daily',
+            routineId: id,
+          });
+        }
+      }
+
+      const nextHabits = await api.getHabits();
+      const nextRoutines = await api.getRoutines();
+      setHabits(nextHabits);
+      setRoutines(nextRoutines);
+      setIsEditRoutineModalOpen(false);
+      setRoutineToEdit(null);
+      toast.success('Routine updated!');
+    } catch (err: any) {
+      toast.error('Error updating routine: ' + err.message);
+    }
+  };
+
+
+  // Handler: Delete routine
+  const handleDeleteRoutine = async (routineId: string) => {
+    const routineToDelete = routines.find((r) => r.id === routineId);
+    if (!routineToDelete) return;
+    openConfirm({
+      title: 'Delete Routine',
+      message: `Delete "${routineToDelete.name}" routine? This will also unlink all habits from this routine.`,
+      confirmLabel: 'Delete',
+      variant: 'danger',
+      onConfirm: async () => {
+        closeConfirm();
+        try {
+          await api.deleteRoutine(routineId);
+          const nextHabits = await api.getHabits();
+          const nextRoutines = await api.getRoutines();
+          setHabits(nextHabits);
+          setRoutines(nextRoutines);
+          setSelectedRoutineId(null);
+          toast.success(`"${routineToDelete.name}" deleted.`);
+        } catch (err: any) {
+          toast.error('Failed to delete routine: ' + err.message);
+        }
+      },
+    });
   };
 
   // Handler: Delete habit permanently
@@ -489,6 +569,9 @@ function AppInner() {
             openCreateRoutine={() => setIsRoutineModalOpen(true)}
             onEditHabit={openEditHabit}
             onRevertHabit={handleRevertHabit}
+            onEditRoutine={handleOpenEditRoutine}
+            onDeleteRoutine={handleDeleteRoutine}
+            onAddHabitToRoutine={openAddHabitToRoutine}
             selectedRoutineId={selectedRoutineId}
             setSelectedRoutineId={setSelectedRoutineId}
             selectedCategoryId={selectedCategoryId}
@@ -550,12 +633,20 @@ function AppInner() {
         onCreate={handleCreateHabitSubmit}
         onSave={handleUpdateHabitSubmit}
         habitToEdit={habitToEdit}
+        prefilledRoutineId={prefilledRoutineId}
       />
 
       <CreateRoutineModal
         isOpen={isRoutineModalOpen}
         onClose={() => setIsRoutineModalOpen(false)}
         onCreate={handleCreateRoutineSubmit}
+      />
+
+      <EditRoutineModal
+        isOpen={isEditRoutineModalOpen}
+        onClose={() => { setIsEditRoutineModalOpen(false); setRoutineToEdit(null); }}
+        routine={routineToEdit}
+        onSave={handleUpdateRoutineSubmit}
       />
 
       {/* Polished confirm dialog — replaces browser confirm() */}
