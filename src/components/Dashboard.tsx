@@ -84,6 +84,27 @@ const getCategoryLabel = (category: Category): string => {
   }
 };
 
+const isHabitCompleteToday = (habit: Habit): boolean =>
+  (habit.history[dateToday] || 0) >= habit.target;
+
+const getRoutineProgressToday = (routine: Routine, habits: Habit[]) => {
+  const routineHabits = habits.filter(h => routine.habitIds.includes(h.id));
+  const totalCount = routineHabits.length;
+  const doneCount = routineHabits.filter(isHabitCompleteToday).length;
+  return {
+    doneCount,
+    totalCount,
+    progress: totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0,
+    allDone: totalCount > 0 && doneCount === totalCount,
+  };
+};
+
+const sortCompletedLast = <T,>(items: T[], isComplete: (item: T) => boolean): T[] =>
+  items
+    .map((item, index) => ({ item, index, isComplete: isComplete(item) }))
+    .sort((a, b) => Number(a.isComplete) - Number(b.isComplete) || a.index - b.index)
+    .map(({ item }) => item);
+
 // ─── CATEGORY RING COMPONENT ──────────────────────────────────────────────────
 
 interface CategoryRingProps {
@@ -267,10 +288,11 @@ function QuickRoutineSheet({ routine, habits, onClose, onLogHabit }: QuickRoutin
 
   if (!routine) return null;
 
-  const completedCount = habits.filter(h => (h.history[dateToday] || 0) >= h.target).length;
+  const completedCount = habits.filter(isHabitCompleteToday).length;
   const totalCount = habits.length;
   const progress = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
   const allDone = totalCount > 0 && completedCount === totalCount;
+  const sortedHabits = sortCompletedLast(habits, isHabitCompleteToday);
 
   const handleCompleteHabit = (habit: Habit) => {
     const current = habit.history[dateToday] || 0;
@@ -283,7 +305,7 @@ function QuickRoutineSheet({ routine, habits, onClose, onLogHabit }: QuickRoutin
     if (isCompletingAll || allDone) return;
     setIsCompletingAll(true);
     try {
-      for (const habit of habits) {
+      for (const habit of sortedHabits) {
         const current = habit.history[dateToday] || 0;
         const remaining = Math.max(0, habit.target - current);
         if (remaining > 0) await Promise.resolve(onLogHabit(habit.id, remaining));
@@ -353,7 +375,7 @@ function QuickRoutineSheet({ routine, habits, onClose, onLogHabit }: QuickRoutin
         </div>
 
         <div className="px-4 md:px-5 pt-3 space-y-2.5">
-          {habits.map((habit) => {
+          {sortedHabits.map((habit) => {
             const current = habit.history[dateToday] || 0;
             const percentage = Math.min(100, Math.round((current / habit.target) * 100));
             const isCompleted = current >= habit.target;
@@ -433,7 +455,7 @@ export default function Dashboard({
   const standaloneHabitsAll = getStandaloneHabits(habits, routines);
 
   const getCategoryStats = (cat: Category) => {
-    const catHabits = standaloneHabitsAll.filter((h) => h.category === cat);
+    const catHabits = habits.filter((h) => h.category === cat);
     if (catHabits.length === 0) return 0;
     let completedRatioSum = 0;
     catHabits.forEach((h) => {
@@ -447,10 +469,10 @@ export default function Dashboard({
 
   const activeCategories = React.useMemo(() => {
     const cats = new Set<Category>();
-    standaloneHabitsAll.forEach((h) => cats.add(h.category));
+    habits.forEach((h) => cats.add(h.category));
     const order: Category[] = ['Fitness', 'Reading', 'Diet', 'Skill', 'Mindset', 'Rest'];
     return order.filter((c) => cats.has(c));
-  }, [standaloneHabitsAll]);
+  }, [habits]);
 
   const categoryProgressList = activeCategories.map((cat) => ({
     name: cat,
@@ -483,7 +505,7 @@ export default function Dashboard({
   const [quickVals, setQuickVals] = useState<{ [key: string]: string }>({});
   const [timeframeFilter, setTimeframeFilter] = useState<'All' | 'Morning' | 'Evening' | 'Night' | 'Anytime'>('All');
   const [selectedRoutineSheetId, setSelectedRoutineSheetId] = useState<string | null>(null);
-  const [showAllRoutines, setShowAllRoutines] = useState(false);
+  const [showAllQuickItems, setShowAllQuickItems] = useState(false);
 
   const journeyStartDate = localStorage.getItem('habit_mountain_journey_start_date');
   let activeGrowthValue = 0.0;
@@ -828,7 +850,10 @@ export default function Dashboard({
             allHabitsFiltered.filter(h => getHabitTimeframe(h, routines) === 'Anytime').length +
             routinesFiltered.filter(rt => rt.timeBlock === 'Constant').length;
 
-          const standaloneHabits = allHabitsFiltered.filter(h => habitMatchesTimeframe(h));
+          const standaloneHabits = sortCompletedLast(
+            allHabitsFiltered.filter(h => habitMatchesTimeframe(h)),
+            isHabitCompleteToday
+          );
           const selectedRoutine = routinesFiltered.find(rt => rt.id === selectedRoutineSheetId) || null;
           const selectedRoutineHabits = selectedRoutine
             ? habits.filter(h => selectedRoutine.habitIds.includes(h.id) && habitMatchesTimeframe(h) && (!selectedPillar || h.category === selectedPillar))
@@ -936,18 +961,18 @@ export default function Dashboard({
                 <div className="space-y-3.5 md:space-y-3">
                   {/* Routines */}
                   {(() => {
-                    const allFilteredRoutines = routinesFiltered.filter(routineMatchesTimeframe);
-                    const visibleRoutines = showAllRoutines ? allFilteredRoutines : allFilteredRoutines.slice(0, 3);
+                    const allFilteredRoutines = sortCompletedLast(
+                      routinesFiltered.filter(routineMatchesTimeframe),
+                      rt => getRoutineProgressToday(rt, habits).allDone
+                    );
+                    const visibleRoutines = showAllQuickItems ? allFilteredRoutines : allFilteredRoutines.slice(0, 3);
                     const hasMore = allFilteredRoutines.length > 3;
                     return (
                       <>
                         {visibleRoutines.map(rt => {
                           const rtHabits = habits.filter(h => rt.habitIds.includes(h.id));
                           if (rtHabits.length === 0) return null;
-                          const doneCount = rtHabits.filter(h => (h.history[dateToday] || 0) >= h.target).length;
-                          const totalCount = rtHabits.length;
-                          const rtProgress = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0;
-                          const allDone = totalCount > 0 && doneCount === totalCount;
+                          const { doneCount, totalCount, progress: rtProgress, allDone } = getRoutineProgressToday(rt, habits);
                           return (
                             <button key={rt.id} type="button" onClick={() => setSelectedRoutineSheetId(rt.id)}
                               aria-label={`Open ${rt.name} routine`}
@@ -991,19 +1016,19 @@ export default function Dashboard({
                             </button>
                           );
                         })}
-                        {hasMore && !showAllRoutines && (
+                        {hasMore && !showAllQuickItems && (
                           <button
                             type="button"
-                            onClick={() => setShowAllRoutines(true)}
+                            onClick={() => setShowAllQuickItems(true)}
                             className="w-full py-2.5 rounded-xl border border-dashed border-[#845EF7]/20 text-[12px] md:text-[11px] font-semibold text-purple-400 hover:bg-[#845EF7]/5 hover:border-[#845EF7]/40 transition cursor-pointer select-none"
                           >
                             View all {allFilteredRoutines.length} routines →
                           </button>
                         )}
-                        {showAllRoutines && allFilteredRoutines.length > 3 && (
+                        {showAllQuickItems && allFilteredRoutines.length > 3 && (
                           <button
                             type="button"
-                            onClick={() => setShowAllRoutines(false)}
+                            onClick={() => setShowAllQuickItems(false)}
                             className="w-full py-2.5 rounded-xl border border-dashed border-gray-800 text-[12px] md:text-[11px] font-semibold text-gray-500 hover:text-gray-300 hover:bg-gray-800/20 transition cursor-pointer select-none"
                           >
                             Show less
