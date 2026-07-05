@@ -12,15 +12,29 @@ import { useToast } from './Toast';
 
 // ─── CATEGORY CONFIG ───────────────────────────────────────────────────────────
 const CAT_CFG: Record<string, { color: string; emoji: string; icon: React.ElementType }> = {
-  Fitness:      { color: '#12B886', emoji: '🏃', icon: Dumbbell },
-  Reading:      { color: '#339AF0', emoji: '📚', icon: BookOpen },
-  Diet:         { color: '#FD7E14', emoji: '🥗', icon: Heart },
-  Skill:        { color: '#FCC419', emoji: '🎯', icon: Target },
-  Mindset:      { color: '#845EF7', emoji: '🧘', icon: Brain },
-  Rest:         { color: '#06B6D4', emoji: '😴', icon: Moon },
+  Fitness:  { color: '#12B886', emoji: '🏃', icon: Dumbbell },
+  Reading:  { color: '#339AF0', emoji: '📚', icon: BookOpen },
+  Diet:     { color: '#FD7E14', emoji: '🥗', icon: Heart },
+  Skill:    { color: '#FCC419', emoji: '🎯', icon: Target },
+  Mindset:  { color: '#845EF7', emoji: '🧘', icon: Brain },
+  Rest:     { color: '#06B6D4', emoji: '😴', icon: Moon },
 };
 
 const getCatConfig = (cat: Category) => CAT_CFG[cat] ?? { color: '#868E96', emoji: '⭐', icon: Sparkles };
+
+// ─── ROUTINE DOMINANT CATEGORY ────────────────────────────────────────────────
+const getRoutineDomCategory = (routine: Routine, habits: Habit[]): Category => {
+  const rh = habits.filter(h => routine.habitIds.includes(h.id));
+  if (rh.length === 0) return 'Mindset';
+  const counts: Record<string, number> = {};
+  rh.forEach(h => { counts[h.category] = (counts[h.category] || 0) + 1; });
+  let maxCat: Category = rh[0].category;
+  let maxN = 0;
+  Object.keys(counts).forEach(cat => {
+    if (counts[cat]! > maxN) { maxN = counts[cat]!; maxCat = cat as Category; }
+  });
+  return maxCat;
+};
 
 const getHabitTimeframeLocal = (habit: Habit, routines: Routine[]): 'Morning'|'Evening'|'Night'|'Anytime' => {
   const parent = routines.find(r => r.habitIds.includes(habit.id));
@@ -249,49 +263,52 @@ export default function HabitsPage({
         </div>
 
         {/* ── Action Bar ── */}
-        <div className="flex flex-wrap gap-2">
-          {/* Complete Entire Routine */}
+        <div className="space-y-2">
+          {/* Primary CTA */}
           {!allDone && rh.length > 0 && (
             <button
               type="button"
               onClick={() => rh.filter(h => (h.history[dateToday]||0) < h.target).forEach(h => onLogHabit(h.id, Math.max(0, h.target - (h.history[dateToday]||0))))}
-              className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-extrabold text-xs px-4 py-3 rounded-xl cursor-pointer transition shadow-lg shadow-emerald-500/20 active:scale-95 min-h-[44px]"
+              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-extrabold text-sm px-4 py-3.5 rounded-xl cursor-pointer transition shadow-lg shadow-emerald-500/20 active:scale-95 min-h-[48px]"
             >
-              <CheckCircle2 className="w-4 h-4" />
+              <CheckCircle2 className="w-5 h-5" />
               Complete All Habits
-              <span className="text-[10px] opacity-75 font-mono">({rh.length - doneInRt} left)</span>
+              <span className="text-[11px] opacity-75 font-mono bg-black/20 px-2 py-0.5 rounded-full">
+                {rh.length - doneInRt} left
+              </span>
             </button>
           )}
           {allDone && rh.length > 0 && (
-            <div className="flex-1 flex items-center justify-center gap-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-extrabold text-xs px-4 py-3 rounded-xl min-h-[44px]">
-              <Check className="w-4 h-4 stroke-[3px]" />
+            <div className="w-full flex items-center justify-center gap-2 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-extrabold text-sm px-4 py-3.5 rounded-xl min-h-[48px]">
+              <Check className="w-5 h-5 stroke-[3px]" />
               Routine Complete! 🎉
             </div>
           )}
-          {/* Add Habit */}
-          <button
-            type="button"
-            onClick={() => onAddHabitToRoutine(rt.id)}
-            className="flex items-center gap-2 bg-[#1A1D2A] hover:bg-[#22263A] border border-purple-500/25 hover:border-purple-500/50 text-purple-400 font-bold text-xs px-4 py-3 rounded-xl cursor-pointer transition active:scale-95 min-h-[44px]"
-          >
-            <Plus className="w-4 h-4" /> Add Habit
-          </button>
-          {/* Edit Routine */}
-          <button
-            type="button"
-            onClick={() => onEditRoutine(rt)}
-            className="flex items-center gap-2 bg-[#1A1D2A] hover:bg-[#22263A] border border-[#2A2F40] hover:border-gray-600 text-gray-300 font-bold text-xs px-4 py-3 rounded-xl cursor-pointer transition active:scale-95 min-h-[44px]"
-          >
-            <Pencil className="w-3.5 h-3.5" /> Edit
-          </button>
-          {/* Delete Routine */}
-          <button
-            type="button"
-            onClick={() => onDeleteRoutine(rt.id)}
-            className="flex items-center gap-2 bg-red-500/8 hover:bg-red-500/15 border border-red-500/25 hover:border-red-500/40 text-red-400 font-bold text-xs px-4 py-3 rounded-xl cursor-pointer transition active:scale-95 min-h-[44px]"
-          >
-            <Trash2 className="w-3.5 h-3.5" /> Delete Routine
-          </button>
+
+          {/* Secondary Actions */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => onAddHabitToRoutine(rt.id)}
+              className="flex-1 flex items-center justify-center gap-1.5 bg-[#1A1D2A] hover:bg-[#22263A] border border-purple-500/25 hover:border-purple-500/50 text-purple-400 font-bold text-xs px-3 py-2.5 rounded-xl cursor-pointer transition active:scale-95 min-h-[40px]"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add Habit
+            </button>
+            <button
+              type="button"
+              onClick={() => onEditRoutine(rt)}
+              className="flex-1 flex items-center justify-center gap-1.5 bg-[#1A1D2A] hover:bg-[#22263A] border border-[#2A2F40] hover:border-gray-600 text-gray-300 font-bold text-xs px-3 py-2.5 rounded-xl cursor-pointer transition active:scale-95 min-h-[40px]"
+            >
+              <Pencil className="w-3.5 h-3.5" /> Edit
+            </button>
+            <button
+              type="button"
+              onClick={() => onDeleteRoutine(rt.id)}
+              className="flex items-center justify-center gap-1.5 bg-red-500/8 hover:bg-red-500/15 border border-red-500/25 hover:border-red-500/40 text-red-400 font-bold text-xs px-3 py-2.5 rounded-xl cursor-pointer transition active:scale-95 min-h-[40px]"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
         {/* ── Habit Steps ── */}
@@ -767,34 +784,110 @@ export default function HabitsPage({
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {routines.map(rt => {
                 const rh   = habits.filter(h => rt.habitIds.includes(h.id) && isHabitScheduledForDate(h, dateToday));
                 const done = rh.filter(h => (h.history[dateToday]||0) >= h.target).length;
                 const pct  = rh.length > 0 ? Math.round((done/rh.length)*100) : 0;
+                const allDone = rh.length > 0 && done === rh.length;
+                const domCat = getRoutineDomCategory(rt, habits);
+                const cfg = getCatConfig(domCat);
+                const IconComp = cfg.icon;
+                const pillarColor = cfg.color;
+                const timeBlockEmoji = rt.timeBlock === 'Morning' ? '☀️' : rt.timeBlock === 'Evening' ? '🌇' : rt.timeBlock === 'Night' ? '🌙' : '🔄';
                 return (
-                  <div key={rt.id} onClick={() => setSelectedRoutineId(rt.id)}
-                    className="bg-[#12141A] hover:bg-[#1A1D28] border border-[#222631] hover:border-purple-500/20 p-5 rounded-2xl shadow-lg cursor-pointer transition flex flex-col justify-between min-h-[220px]">
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[10px] font-mono tracking-widest text-[#B197FC] font-semibold bg-[#B197FC]/5 border border-[#B197FC]/15 px-2.5 py-0.5 rounded uppercase">
-                          {rt.timeBlock} Block
-                        </span>
-                        <span className="text-xs text-[#FCC419] font-mono flex items-center gap-1">
-                          <Zap className="w-3 h-3 fill-[#FCC419]" /> {rt.points} Bonus
-                        </span>
+                  <div
+                    key={rt.id}
+                    className="group relative bg-[#12141A] hover:bg-[#171A26] border rounded-2xl shadow-lg overflow-hidden transition-all duration-200 flex flex-col"
+                    style={{ borderColor: allDone ? 'rgba(18,184,134,0.3)' : `${pillarColor}22` }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = allDone ? 'rgba(18,184,134,0.5)' : `${pillarColor}55`; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = allDone ? 'rgba(18,184,134,0.3)' : `${pillarColor}22`; }}
+                  >
+                    {/* Color accent strip */}
+                    <div className="h-1 w-full" style={{ background: `linear-gradient(90deg, ${pillarColor}, ${pillarColor}44)` }} />
+
+                    {/* Card Body (clickable area) */}
+                    <div
+                      onClick={() => setSelectedRoutineId(rt.id)}
+                      className="flex-1 p-4 cursor-pointer"
+                    >
+                      {/* Header row */}
+                      <div className="flex items-start justify-between gap-2 mb-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-10 w-10 rounded-xl flex items-center justify-center border shrink-0"
+                            style={{ backgroundColor: `${pillarColor}14`, borderColor: `${pillarColor}28`, color: pillarColor }}>
+                            <IconComp className="w-4.5 h-4.5" />
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-bold text-white leading-tight">{rt.name}</h3>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded border font-bold uppercase"
+                                style={{ color: pillarColor, borderColor: `${pillarColor}30`, background: `${pillarColor}12` }}>
+                                {domCat}
+                              </span>
+                              <span className="text-[9px] text-gray-500 font-mono">{timeBlockEmoji} {rt.timeBlock}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <div className="text-xs font-bold font-mono text-[#FCC419] flex items-center gap-0.5 justify-end">
+                            <Zap className="w-3 h-3 fill-[#FCC419]" /> {rt.points}
+                          </div>
+                          <div className="text-[9px] text-gray-500 font-mono">bonus pts</div>
+                        </div>
                       </div>
-                      <h3 className="text-xl font-bold text-white mt-4">{rt.name}</h3>
-                      <p className="text-xs text-gray-500 mt-1">{done} of {rh.length} habits done today</p>
+
+                      {/* Stats */}
+                      <p className="text-[11px] text-gray-500 mb-2.5 font-mono">
+                        {allDone ? '✅ Complete!' : `${done} of ${rh.length} done today`}
+                        {rh.length === 0 && ' · No habits yet'}
+                      </p>
+
+                      {/* Progress Bar */}
+                      <div>
+                        <div className="flex justify-between items-baseline text-[10px] mb-1 font-mono">
+                          <span style={{ color: pillarColor }}>{pct}%</span>
+                          <span className="text-gray-600">{done}/{rh.length}</span>
+                        </div>
+                        <div className="w-full h-2 bg-[#0E1018] rounded-full overflow-hidden border border-[#1E2130]">
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{
+                              width: `${pct}%`,
+                              background: allDone ? 'linear-gradient(90deg, #12B886, #06B6D4)' : pillarColor,
+                              boxShadow: pct > 0 ? `0 0 8px ${pillarColor}66` : 'none',
+                            }}
+                          />
+                        </div>
+                      </div>
                     </div>
-                    <div className="mt-5">
-                      <div className="flex justify-between items-baseline text-xs mb-1.5 font-semibold font-mono">
-                        <span className="text-[#B197FC]">{pct}% Done</span>
-                        <span className="text-gray-500">{done}/{rh.length}</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-[#171924]/80 rounded-full overflow-hidden border border-[#222631]">
-                        <div className="h-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-300"
-                          style={{ width: `${pct}%` }} />
+
+                    {/* Action Footer */}
+                    <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-t border-[#1C1F2B] bg-[#0E1016]/60">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedRoutineId(rt.id)}
+                        className="flex items-center gap-1.5 text-[11px] font-bold text-gray-400 hover:text-white transition cursor-pointer"
+                      >
+                        <ListChecks className="w-3.5 h-3.5" /> View Steps
+                      </button>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); onEditRoutine(rt); }}
+                          className="p-1.5 rounded-lg text-gray-500 hover:text-purple-400 hover:bg-purple-500/10 transition cursor-pointer"
+                          title="Edit routine"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); onDeleteRoutine(rt.id); }}
+                          className="p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition cursor-pointer"
+                          title="Delete routine"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </div>
                   </div>
