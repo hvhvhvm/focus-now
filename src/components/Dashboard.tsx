@@ -1018,30 +1018,27 @@ export default function Dashboard({
                                   style={{ borderColor: `${pillarColor}20`, backgroundColor: `${pillarColor}10`, color: pillarColor }}>
                                   <IconComp className="w-4.5 h-4.5 md:w-3.5 md:h-3.5" />
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 md:gap-1.5">
-                                    <span className="text-[14px] md:text-[12px] font-bold text-white truncate">{rt.name}</span>
-                                    {rt.timeBlock && (
-                                      <span className="text-[10px] md:text-[8px] font-mono border px-2 py-0.5 md:px-1.5 rounded uppercase tracking-wider shrink-0"
-                                        style={{ color: pillarColor, backgroundColor: `${pillarColor}10`, borderColor: `${pillarColor}20` }}>
-                                        {rt.timeBlock}
-                                      </span>
-                                    )}
-                                    <span className="text-[10px] md:text-[8px] font-mono text-gray-500 bg-[#1D212F] border border-gray-800 px-2 py-0.5 md:px-1.5 rounded uppercase tracking-wider shrink-0">
-                                      {rtCategory}
-                                    </span>
+                              <div className="flex-1 min-w-0">
+                                  {/* Name — full width, always visible */}
+                                  <div className="flex items-center gap-1.5 mb-1">
+                                    <span className="text-[14px] md:text-[13px] font-bold text-white leading-tight">{rt.name}</span>
                                     {allDone && (
-                                      <span className="text-[10px] md:text-[8px] font-mono text-[#12B886] bg-[#12B886]/10 border border-[#12B886]/20 px-2 py-0.5 md:px-1.5 rounded uppercase tracking-wider shrink-0 animate-pulse">
-                                        Done
+                                      <span className="shrink-0 text-[9px] font-mono text-[#12B886] bg-[#12B886]/10 border border-[#12B886]/20 px-1.5 py-0.5 rounded uppercase tracking-wider animate-pulse">
+                                        ✓
                                       </span>
                                     )}
                                   </div>
-                                  <div className="flex items-center gap-2 md:gap-1.5 mt-1.5 md:mt-1">
-                                    <div className="flex-1 h-1.5 md:h-1 bg-gray-800 rounded-full overflow-hidden">
+                                  {/* Tags + progress row */}
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-[9px] font-mono border px-1.5 py-0.5 rounded uppercase tracking-wider shrink-0"
+                                      style={{ color: pillarColor, backgroundColor: `${pillarColor}10`, borderColor: `${pillarColor}20` }}>
+                                      {rt.timeBlock}
+                                    </span>
+                                    <div className="flex-1 h-1.5 bg-gray-800 rounded-full overflow-hidden min-w-[40px]">
                                       <div className="h-full rounded-full transition-all duration-500"
                                         style={{ width: `${rtProgress}%`, backgroundColor: pillarColor, boxShadow: `0 0 4px ${pillarColor}` }} />
                                     </div>
-                                    <span className="text-[11px] md:text-[9px] font-mono shrink-0" style={{ color: pillarColor }}>{doneCount}/{totalCount}</span>
+                                    <span className="text-[10px] font-mono shrink-0" style={{ color: pillarColor }}>{doneCount}/{totalCount}</span>
                                   </div>
                                 </div>
                                 <div className="flex items-center gap-2 md:gap-1.5 shrink-0">
