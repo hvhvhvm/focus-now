@@ -1075,20 +1075,44 @@ export default function Dashboard({
                   })()}
 
                   {/* Standalone habits */}
-                  {standaloneHabits.length > 0 && (
-                    <div className="space-y-2 md:space-y-1.5">
-                      {routinesFiltered.length > 0 && (
-                        <div className="text-[11px] md:text-[9px] font-mono text-gray-600 uppercase tracking-widest font-bold px-1 pt-1.5 md:pt-1">
-                          Individual Habits
-                        </div>
-                      )}
-                      {standaloneHabits.map(item => (
-                        <React.Fragment key={item.id}>
-                          <HabitCard item={item} />
-                        </React.Fragment>
-                      ))}
-                    </div>
-                  )}
+                  {standaloneHabits.length > 0 && (() => {
+                    const HABIT_LIMIT = 5;
+                    const visibleHabits = showAllQuickItems ? standaloneHabits : standaloneHabits.slice(0, HABIT_LIMIT);
+                    const habitHasMore = standaloneHabits.length > HABIT_LIMIT;
+                    return (
+                      <div className="space-y-2 md:space-y-1.5">
+                        {routinesFiltered.length > 0 && (
+                          <div className="text-[11px] md:text-[9px] font-mono text-gray-600 uppercase tracking-widest font-bold px-1 pt-1.5 md:pt-1">
+                            Individual Habits
+                          </div>
+                        )}
+                        {visibleHabits.map(item => (
+                          <React.Fragment key={item.id}>
+                            <HabitCard item={item} />
+                          </React.Fragment>
+                        ))}
+                        {habitHasMore && !showAllQuickItems && (
+                          <button
+                            type="button"
+                            onClick={() => setShowAllQuickItems(true)}
+                            className="w-full py-2.5 rounded-xl border border-dashed border-[#12B886]/20 text-[12px] md:text-[11px] font-semibold text-[#12B886] hover:bg-[#12B886]/5 hover:border-[#12B886]/40 transition cursor-pointer select-none flex items-center justify-center gap-1.5"
+                          >
+                            <span>View all {standaloneHabits.length} habits</span>
+                            <span className="font-mono">→</span>
+                          </button>
+                        )}
+                        {showAllQuickItems && habitHasMore && (
+                          <button
+                            type="button"
+                            onClick={() => setShowAllQuickItems(false)}
+                            className="w-full py-2.5 rounded-xl border border-dashed border-gray-800 text-[12px] md:text-[11px] font-semibold text-gray-500 hover:text-gray-300 hover:bg-gray-800/20 transition cursor-pointer select-none"
+                          >
+                            Show less
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 
