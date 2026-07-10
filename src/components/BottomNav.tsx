@@ -4,6 +4,7 @@ import {
   CheckSquare,
   Activity,
   TrendingUp,
+  Calendar,
   User,
 } from 'lucide-react';
 
@@ -17,6 +18,7 @@ const navItems = [
   { id: 'habits', label: 'Habits', icon: CheckSquare },
   { id: 'momentum', label: 'Momentum', icon: Activity },
   { id: '1%better', label: '1% Better', icon: TrendingUp },
+  { id: 'calendar', label: 'Calendar', icon: Calendar },
   { id: 'profile', label: 'Profile', icon: User },
 ];
 

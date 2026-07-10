@@ -5,6 +5,7 @@ import Dashboard from './components/Dashboard';
 import HabitsPage from './components/HabitsPage';
 import MomentumPage from './components/MomentumPage';
 import OnePercentBetterPage from './components/OnePercentBetterPage';
+import CalendarPage from './components/CalendarPage';
 import InsightsPage from './components/InsightsPage';
 import ProfilePage from './components/ProfilePage';
 import AuthPage from './components/AuthPage';
@@ -184,26 +185,69 @@ function AppInner() {
 
 
   // Handler: Log count/timer progress against a specific habit
-  const handleLogHabit = async (id: string, value: number) => {
+  const handleLogHabit = (id: string, value: number) => {
+    return handleLogHabitForDate(id, dateToday, value);
+  };
+
+  // Handler: Log count/timer progress against a specific habit for a custom date
+  const handleLogHabitForDate = async (id: string, dateStr: string, value: number) => {
     try {
       const targetHabit = habits.find((h) => h.id === id);
       if (!targetHabit) return;
 
-      const curToday = targetHabit.history[dateToday] || 0;
-      const newToday = curToday + value;
+      const curVal = targetHabit.history[dateStr] || 0;
+      const newVal = curVal + value;
 
-      const wasCompleted = curToday >= targetHabit.target;
-      const nowCompleted = newToday >= targetHabit.target;
+      const wasCompleted = curVal >= targetHabit.target;
+      const nowCompleted = newVal >= targetHabit.target;
 
-      if (newToday < 0 || (wasCompleted && nowCompleted)) return;
+      if (newVal < 0 || (wasCompleted && nowCompleted)) return;
 
-      await api.logHabit(id, dateToday, value);
+      await api.logHabit(id, dateStr, value);
 
       const updatedHabits = await api.getHabits();
       setHabits(updatedHabits);
-      const nextPoints = calculateTotalEarnedPoints(updatedHabits, routines);
+
+      // Recalculate routines for this specific date
+      let updatedRoutines = routines;
+      const routinesToUpdate: { id: string; completed: boolean }[] = [];
+      let pointsBonus = 0;
+
+      routines.forEach((rt) => {
+        if (rt.habitIds.includes(id)) {
+          const routineHabits = updatedHabits.filter((h) => rt.habitIds.includes(h.id));
+          const allDone =
+            routineHabits.length > 0 &&
+            routineHabits.every((h) => (h.history[dateStr] || 0) >= h.target);
+          const wasDoneEarlier = rt.completedHistory[dateStr] || false;
+
+          if (allDone && !wasDoneEarlier) {
+            pointsBonus += rt.points;
+            routinesToUpdate.push({ id: rt.id, completed: true });
+          } else if (!allDone && wasDoneEarlier) {
+            pointsBonus -= rt.points;
+            routinesToUpdate.push({ id: rt.id, completed: false });
+          }
+        }
+      });
+
+      if (routinesToUpdate.length > 0) {
+        for (const item of routinesToUpdate) {
+          await api.setRoutineStatus(item.id, dateStr, item.completed);
+        }
+        updatedRoutines = await api.getRoutines();
+        setRoutines(updatedRoutines);
+      }
+
+      const nextPoints = calculateTotalEarnedPoints(updatedHabits, updatedRoutines);
       setUserPoints(nextPoints);
       await api.syncJourney({ total_points: nextPoints });
+
+      if (pointsBonus > 0) {
+        toast.success(`Routine mastered! +${pointsBonus} bonus points earned!`);
+      } else if (pointsBonus < 0) {
+        toast.info(`Routine status updated. Points adjusted.`);
+      }
 
     } catch (err: any) {
       console.error('Failed to sync logged progression:', err);
@@ -338,7 +382,7 @@ function AppInner() {
         const name = rtData.habitNames[i];
         const hRes = await api.createHabit({
           name,
-          category: rtData.category || 'Custom',
+          category: rtData.category || 'Skill',
           points: 10,
           type: 'Count',
           target: 10,
@@ -589,14 +633,20 @@ function AppInner() {
         {currentTab === '1%better' && (
           <OnePercentBetterPage
             habits={habits}
+          />
+        )}
+
+        {currentTab === 'calendar' && (
+          <CalendarPage
+            habits={habits}
             routines={routines}
+            onLogHabitForDate={handleLogHabitForDate}
           />
         )}
 
         {currentTab === 'insights' && (
           <InsightsPage
             habits={habits}
-            routines={routines}
             userPoints={userPoints}
           />
         )}
@@ -606,7 +656,6 @@ function AppInner() {
             currentUser={currentUser}
             userPoints={userPoints}
             habits={habits}
-            routines={routines}
             momentumScore={currentLiveMomentumScore}
             onLogout={handleLogout}
             onReset={handleResetApp}

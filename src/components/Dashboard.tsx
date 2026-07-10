@@ -81,7 +81,7 @@ const getCategoryLabel = (category: Category): string => {
     case 'Skill':   return 'Skil';
     case 'Mindset': return 'Mind';
     case 'Rest':    return 'Rest';
-    default:        return category.slice(0, 4);
+    default:        return (category as string).slice(0, 4);
   }
 };
 
@@ -226,13 +226,14 @@ const fireConfetti = () => {
 // ─── CATEGORY RING COMPONENT ──────────────────────────────────────────────────
 
 interface CategoryRingProps {
+  key?: any;
   category: Category;
   pct: number;
   isSelected: boolean;
   onClick: () => void;
 }
 
-function CategoryRing({ category, pct, isSelected, onClick }: CategoryRingProps) {
+function CategoryRing({ category, pct, isSelected, onClick }: CategoryRingProps): React.ReactElement {
   const color = getCategoryColor(category);
   const emoji = getCategoryEmoji(category);
   const size = 56;

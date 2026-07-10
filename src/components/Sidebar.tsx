@@ -4,6 +4,7 @@ import {
   CheckSquare, 
   Activity, 
   TrendingUp, 
+  Calendar,
   BarChart3, 
   Sparkles, 
   RefreshCw, 
@@ -35,7 +36,8 @@ export default function Sidebar({ currentTab, setTab, userPoints, momentumScore,
     { id: 'dashboard', name: 'Dashboard', icon: LayoutDashboard },
     { id: 'habits', name: 'Habits', icon: CheckSquare },
     { id: 'momentum', name: 'Momentum', icon: Activity, badge: `${momentumScore}%` },
-    { id: '1%better', name: '1% Better', icon: TrendingUp, isNew: true },
+    { id: '1%better', name: '1% Better', icon: TrendingUp },
+    { id: 'calendar', name: 'Calendar', icon: Calendar, isNew: true },
     { id: 'insights', name: 'Insights', icon: BarChart3 },
     { id: 'profile', name: 'Profile', icon: User }
   ];
