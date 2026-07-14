@@ -1,11 +1,19 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import confetti from 'canvas-confetti';
-import { Zap, AlertTriangle, ArrowUpRight, TrendingUp, Dumbbell, BookOpen, Brain, Sparkles, CheckCircle2, Navigation, Clock, Check, ChevronRight, X, Target, Heart, Moon, GripVertical, Flame, Sun } from 'lucide-react';
+import { Zap, AlertTriangle, ArrowUpRight, TrendingUp, Dumbbell, BookOpen, Brain, Sparkles, CheckCircle2, Navigation, Clock, Check, ChevronRight, X, Target, Heart, Moon, GripVertical, Flame, Sun, Pencil, Plus, Trash2, ListTodo } from 'lucide-react';
 import { Habit, Category, Routine } from '../types';
-import { calculateMomentum, dateToday, getDailyTaskCounts, getStandaloneHabits, formatDateString } from '../data';
+import { calculateMomentum, dateToday, getDailyTaskCounts, getStandaloneHabits, getRoutineHabits, formatDateString } from '../data';
 import CategoryDetailView from './CategoryDetailView';
 
 type LogHabitHandler = (id: string, value: number) => void | Promise<void>;
+
+// ─── DAILY TODO TYPES ─────────────────────────────────────────────────────────
+
+interface TodoItem {
+  id: string;
+  text: string;
+  completed: boolean;
+}
 
 // ─── CATEGORY CONFIG ──────────────────────────────────────────────────────────
 
@@ -34,7 +42,7 @@ const getCategoryEmoji = (category: Category): string => {
 };
 
 const getHabitTimeframe = (habit: Habit, routines: Routine[]): 'Morning' | 'Evening' | 'Night' | 'Anytime' => {
-  const parentRoutine = routines.find(r => r.habitIds.includes(habit.id));
+  const parentRoutine = routines.find(r => r.habitIds.includes(habit.id) || habit.routineId === r.id);
   if (parentRoutine) {
     if (parentRoutine.timeBlock === 'Morning') return 'Morning';
     if (parentRoutine.timeBlock === 'Evening') return 'Evening';
@@ -89,7 +97,7 @@ const isHabitCompleteToday = (habit: Habit): boolean =>
   (habit.history[dateToday] || 0) >= habit.target;
 
 const getRoutineProgressToday = (routine: Routine, habits: Habit[]) => {
-  const routineHabits = habits.filter(h => routine.habitIds.includes(h.id));
+  const routineHabits = getRoutineHabits(routine, habits);
   const totalCount = routineHabits.length;
   const doneCount = routineHabits.filter(isHabitCompleteToday).length;
   return {
@@ -101,7 +109,7 @@ const getRoutineProgressToday = (routine: Routine, habits: Habit[]) => {
 };
 
 const getRoutineCategory = (routine: Routine, habits: Habit[]): Category => {
-  const routineHabits = habits.filter(h => routine.habitIds.includes(h.id));
+  const routineHabits = getRoutineHabits(routine, habits);
   if (routineHabits.length === 0) return 'Mindset';
   
   const counts = {} as Record<Category, number>;
@@ -222,6 +230,188 @@ const fireConfetti = () => {
   fire(0.1, { spread: 120, startVelocity: 25, decay: 0.92, scalar: 1.2, colors: ['#12B886'] });
   fire(0.1, { spread: 120, startVelocity: 45, colors: ['#FCC419'] });
 };
+
+// ─── DAILY TODO MODAL ────────────────────────────────────────────────────────
+
+interface DailyTodoModalProps {
+  todos: TodoItem[];
+  onAdd: (text: string) => void;
+  onToggle: (id: string) => void;
+  onDelete: (id: string) => void;
+  onClose: () => void;
+  completedCount: number;
+  totalCount: number;
+  progressPct: number;
+}
+
+function DailyTodoModal({ todos, onAdd, onToggle, onDelete, onClose, completedCount, totalCount, progressPct }: DailyTodoModalProps) {
+  const [inputVal, setInputVal] = React.useState('');
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  React.useEffect(() => {
+    setTimeout(() => inputRef.current?.focus(), 80);
+  }, []);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = inputVal.trim();
+    if (!trimmed) return;
+    onAdd(trimmed);
+    setInputVal('');
+    inputRef.current?.focus();
+  };
+
+  const allDone = totalCount > 0 && completedCount >= totalCount;
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="daily-todo-modal-title">
+      {/* Backdrop */}
+      <button
+        type="button"
+        aria-label="Close daily focus"
+        onClick={onClose}
+        className="absolute inset-0 bg-black/70 backdrop-blur-md cursor-default"
+      />
+
+      {/* Panel */}
+      <div className="relative z-10 w-full max-w-md bg-[#0F1118] border border-[#252B3A] rounded-2xl shadow-[0_24px_80px_rgba(0,0,0,0.7)] flex flex-col overflow-hidden" style={{ maxHeight: '90vh' }}>
+
+        {/* Glow accents */}
+        <div className="absolute top-0 left-0 w-64 h-32 bg-gradient-to-br from-[#845EF7]/10 to-transparent rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-48 h-48 bg-gradient-to-tl from-[#12B886]/8 to-transparent rounded-full blur-2xl pointer-events-none" />
+
+        {/* Header */}
+        <div className="relative flex items-start justify-between gap-3 px-5 pt-5 pb-4 border-b border-[#1E2232]">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-[#845EF7]/15 border border-[#845EF7]/30 text-[#845EF7]">
+                <ListTodo className="h-4 w-4" />
+              </span>
+              <h2 id="daily-todo-modal-title" className="text-base font-extrabold text-white tracking-tight">Daily Focus</h2>
+              {totalCount > 0 && (
+                <span className={`ml-1 text-[11px] font-mono font-bold px-2 py-0.5 rounded-full border ${
+                  allDone
+                    ? 'bg-[#12B886]/15 border-[#12B886]/35 text-[#12B886]'
+                    : 'bg-[#845EF7]/12 border-[#845EF7]/30 text-[#845EF7]'
+                }`}>
+                  {allDone ? '✓ All done' : `${completedCount}/${totalCount}`}
+                </span>
+              )}
+            </div>
+            {totalCount > 0 && (
+              <div className="mt-2">
+                <div className="flex items-center justify-between text-[10px] font-mono text-gray-500 mb-1">
+                  <span>Progress</span>
+                  <span className={allDone ? 'text-[#12B886]' : 'text-[#845EF7]'}>{progressPct}%</span>
+                </div>
+                <div className="h-1.5 w-full bg-[#181B25] rounded-full overflow-hidden border border-[#252B3A]">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{
+                      width: `${progressPct}%`,
+                      background: allDone
+                        ? 'linear-gradient(90deg, #12B886, #06B6D4)'
+                        : 'linear-gradient(90deg, #845EF7, #5C7CFA)',
+                      boxShadow: allDone ? '0 0 8px rgba(18,184,134,0.5)' : '0 0 8px rgba(132,94,247,0.5)',
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close daily focus modal"
+            className="h-8 w-8 shrink-0 rounded-full border border-[#2B3040] bg-[#181B25] text-gray-400 hover:text-white hover:bg-[#202434] transition flex items-center justify-center"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Todo List */}
+        <div className="flex-1 overflow-y-auto px-5 py-3 space-y-2" style={{ minHeight: 0 }}>
+          {todos.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-10 text-center select-none">
+              <div className="text-4xl mb-3">🎯</div>
+              <p className="text-sm font-semibold text-gray-400">Your day is a blank canvas.</p>
+              <p className="text-xs text-gray-600 mt-1">Add your first focus task below.</p>
+            </div>
+          )}
+          {allDone && todos.length > 0 && (
+            <div className="rounded-xl bg-[#12B886]/8 border border-[#12B886]/25 px-4 py-3 flex items-center gap-3 mb-2">
+              <span className="text-2xl">🎉</span>
+              <div>
+                <p className="text-sm font-bold text-[#12B886]">All focus tasks completed!</p>
+                <p className="text-[11px] text-[#12B886]/70">Awesome job today!</p>
+              </div>
+            </div>
+          )}
+          {todos.map((todo) => (
+            <div
+              key={todo.id}
+              className="group flex items-center gap-3 rounded-xl border border-[#1E2232] bg-[#13161F] px-4 py-3 transition hover:border-[#2B3240] hover:bg-[#181B28]"
+            >
+              {/* Checkbox */}
+              <button
+                type="button"
+                onClick={() => onToggle(todo.id)}
+                aria-label={todo.completed ? `Uncheck ${todo.text}` : `Check ${todo.text}`}
+                className={`h-5 w-5 shrink-0 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
+                  todo.completed
+                    ? 'bg-[#12B886] border-[#12B886] text-black'
+                    : 'border-[#3A4055] hover:border-[#845EF7] hover:bg-[#845EF7]/10'
+                }`}
+              >
+                {todo.completed && <Check className="h-2.5 w-2.5 stroke-[3px]" />}
+              </button>
+
+              {/* Text */}
+              <span className={`flex-1 min-w-0 text-sm font-medium leading-snug transition-all duration-200 ${
+                todo.completed ? 'line-through text-gray-600' : 'text-gray-100'
+              }`}>
+                {todo.text}
+              </span>
+
+              {/* Delete — hover visible */}
+              <button
+                type="button"
+                onClick={() => onDelete(todo.id)}
+                aria-label={`Delete ${todo.text}`}
+                className="h-6 w-6 shrink-0 rounded-lg text-gray-700 hover:text-[#FF4757] hover:bg-[#FF4757]/10 transition flex items-center justify-center opacity-0 group-hover:opacity-100 focus:opacity-100"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Add Input */}
+        <div className="relative border-t border-[#1E2232] px-4 py-3">
+          <form onSubmit={handleSubmit} className="flex items-center gap-2">
+            <input
+              ref={inputRef}
+              type="text"
+              value={inputVal}
+              onChange={(e) => setInputVal(e.target.value)}
+              placeholder="Add a focus task and press Enter…"
+              maxLength={120}
+              className="flex-1 bg-[#181B25] border border-[#252B3A] rounded-xl text-sm text-white placeholder-gray-600 px-4 py-2.5 outline-none focus:border-[#845EF7]/60 focus:ring-1 focus:ring-[#845EF7]/30 transition"
+            />
+            <button
+              type="submit"
+              disabled={!inputVal.trim()}
+              aria-label="Add focus task"
+              className="h-9 w-9 shrink-0 rounded-xl bg-[#845EF7] text-white flex items-center justify-center hover:bg-[#9775FA] transition active:scale-95 disabled:opacity-30 disabled:pointer-events-none"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── CATEGORY RING COMPONENT ──────────────────────────────────────────────────
 
@@ -699,10 +889,18 @@ interface QuickRoutineSheetProps {
   habits: Habit[];
   onClose: () => void;
   onLogHabit: LogHabitHandler;
+  onDeleteHabit?: (id: string) => void;
+  onCreateHabitInRoutine?: (routineId: string, name: string, category: Category) => Promise<void>;
 }
 
-function QuickRoutineSheet({ routine, habits, onClose, onLogHabit }: QuickRoutineSheetProps) {
+
+function QuickRoutineSheet({ routine, habits, onClose, onLogHabit, onDeleteHabit, onCreateHabitInRoutine }: QuickRoutineSheetProps) {
   const [isCompletingAll, setIsCompletingAll] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [newHabitName, setNewHabitName] = useState('');
+  const [isAddingHabit, setIsAddingHabit] = useState(false);
+  const addInputRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     if (!routine) return;
@@ -784,11 +982,31 @@ function QuickRoutineSheet({ routine, habits, onClose, onLogHabit }: QuickRoutin
                   </div>
                 </div>
               </div>
-              <button type="button" onClick={onClose}
-                className="h-9 w-9 shrink-0 rounded-full border border-[#2B3040] bg-[#181B25] text-gray-400 hover:text-white hover:bg-[#202434] transition flex items-center justify-center"
-                aria-label="Close routine sheet">
-                <X className="h-4.5 w-4.5" />
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                {/* Edit toggle */}
+                <button
+                  type="button"
+                  onClick={() => setIsEditMode(prev => !prev)}
+                  aria-label={isEditMode ? 'Done editing' : 'Edit routine'}
+                  className={`h-9 px-3 rounded-full border text-xs font-bold transition flex items-center gap-1.5 ${
+                    isEditMode
+                      ? 'border-[#FCC419]/50 bg-[#FCC419]/15 text-[#FCC419] hover:bg-[#FCC419]/25'
+                      : 'border-[#2B3040] bg-[#181B25] text-gray-400 hover:text-white hover:bg-[#202434]'
+                  }`}
+                >
+                  {isEditMode ? (
+                    <><Check className="h-3.5 w-3.5" /><span>Done</span></>
+                  ) : (
+                    <><Pencil className="h-3.5 w-3.5" /><span>Edit</span></>
+                  )}
+                </button>
+                {/* Close */}
+                <button type="button" onClick={onClose}
+                  className="h-9 w-9 shrink-0 rounded-full border border-[#2B3040] bg-[#181B25] text-gray-400 hover:text-white hover:bg-[#202434] transition flex items-center justify-center"
+                  aria-label="Close routine sheet">
+                  <X className="h-4.5 w-4.5" />
+                </button>
+              </div>
             </div>
 
             <div className="mt-3 rounded-xl border border-[#252B3A] bg-[#151822] p-3.5">
@@ -803,12 +1021,20 @@ function QuickRoutineSheet({ routine, habits, onClose, onLogHabit }: QuickRoutin
               <div className="mt-1.5 text-right text-[10px] font-mono text-gray-500">{progress}%</div>
             </div>
 
-            <button type="button" onClick={handleCompleteAll}
-              disabled={allDone || isCompletingAll || totalCount === 0}
-              className="mt-3 w-full min-h-[46px] rounded-xl border border-[#12B886]/25 bg-[#12B886]/12 text-[#12B886] hover:bg-[#12B886]/20 disabled:bg-[#151822] disabled:text-gray-600 disabled:border-[#252B3A] font-extrabold text-sm transition flex items-center justify-center gap-2 active:scale-[0.99]">
-              <Zap className="h-4 w-4 fill-current" />
-              <span>{allDone ? 'Routine Complete' : isCompletingAll ? 'Completing...' : '1-TAP Complete All'}</span>
-            </button>
+            {!isEditMode && (
+              <button type="button" onClick={handleCompleteAll}
+                disabled={allDone || isCompletingAll || totalCount === 0}
+                className="mt-3 w-full min-h-[46px] rounded-xl border border-[#12B886]/25 bg-[#12B886]/12 text-[#12B886] hover:bg-[#12B886]/20 disabled:bg-[#151822] disabled:text-gray-600 disabled:border-[#252B3A] font-extrabold text-sm transition flex items-center justify-center gap-2 active:scale-[0.99]">
+                <Zap className="h-4 w-4 fill-current" />
+                <span>{allDone ? 'Routine Complete' : isCompletingAll ? 'Completing...' : '1-TAP Complete All'}</span>
+              </button>
+            )}
+            {isEditMode && (
+              <div className="mt-3 rounded-xl border border-[#FCC419]/20 bg-[#FCC419]/8 px-3.5 py-2.5 flex items-center gap-2">
+                <Pencil className="h-3.5 w-3.5 text-[#FCC419] shrink-0" />
+                <span className="text-[11px] text-[#FCC419]/80 font-semibold">Edit mode — remove habits or add new ones below</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -820,10 +1046,39 @@ function QuickRoutineSheet({ routine, habits, onClose, onLogHabit }: QuickRoutin
             const isCompleted = current >= habit.target;
             const config = getQuickHabitConfig(habit.category);
             const Icon = config.icon;
+            const isDeleting = deletingId === habit.id;
             return (
               <div key={habit.id}
-                className={`relative overflow-hidden rounded-2xl border bg-[#141720] p-3.5 transition ${isCompleted ? 'border-[#12B886]/20 opacity-75' : 'border-[#252B3A]'}`}>
+                className={`relative overflow-hidden rounded-2xl border bg-[#141720] p-3.5 transition ${
+                  isEditMode
+                    ? 'border-[#FCC419]/20'
+                    : isCompleted
+                    ? 'border-[#12B886]/20 opacity-75'
+                    : 'border-[#252B3A]'
+                }`}>
                 <div className="flex items-center gap-3">
+                  {/* Delete button — only visible in edit mode */}
+                  {isEditMode && onDeleteHabit && (
+                    <button
+                      type="button"
+                      disabled={isDeleting}
+                      onClick={async () => {
+                        setDeletingId(habit.id);
+                        try {
+                          await Promise.resolve(onDeleteHabit(habit.id));
+                        } finally {
+                          setDeletingId(null);
+                        }
+                      }}
+                      aria-label={`Delete ${habit.name}`}
+                      className="h-8 w-8 shrink-0 rounded-full border border-[#FF4757]/40 bg-[#FF4757]/10 text-[#FF4757] hover:bg-[#FF4757]/25 hover:border-[#FF4757]/70 transition flex items-center justify-center active:scale-95 disabled:opacity-50"
+                      style={{ animation: isDeleting ? 'none' : 'editWiggle 0.5s ease-in-out' }}
+                    >
+                      {isDeleting
+                        ? <span className="h-3.5 w-3.5 rounded-full border-2 border-[#FF4757] border-t-transparent animate-spin" />
+                        : <Trash2 className="h-3.5 w-3.5" />}
+                    </button>
+                  )}
                   <div className="h-11 w-11 shrink-0 rounded-full border flex items-center justify-center"
                     style={{ backgroundColor: `${config.color}14`, borderColor: `${config.color}28`, color: config.color }}>
                     <Icon className="h-5 w-5" />
@@ -831,7 +1086,7 @@ function QuickRoutineSheet({ routine, habits, onClose, onLogHabit }: QuickRoutin
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
                       <h4 className="truncate text-[15px] font-bold text-white">{habit.name}</h4>
-                      {isCompleted && (
+                      {!isEditMode && isCompleted && (
                         <span className="shrink-0 rounded border border-[#12B886]/20 bg-[#12B886]/10 px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase text-[#12B886]">Done</span>
                       )}
                     </div>
@@ -843,28 +1098,83 @@ function QuickRoutineSheet({ routine, habits, onClose, onLogHabit }: QuickRoutin
                       </span>
                     </div>
                   </div>
-                  <button type="button" onClick={() => {
-                    const current = habit.history[dateToday] || 0;
-                    const remaining = Math.max(0, habit.target - current);
-                    if (remaining > 0) onLogHabit(habit.id, remaining);
-                  }} disabled={isCompleted}
-                    aria-label={isCompleted ? `${habit.name} complete` : `Complete ${habit.name}`}
-                    className={`h-10 w-10 shrink-0 rounded-full border-2 transition flex items-center justify-center active:scale-95 ${isCompleted
-                      ? 'border-[#12B886] bg-[#12B886] text-black'
-                      : 'border-[#30364A] bg-transparent hover:border-[#12B886] hover:bg-[#12B886]/10'}`}>
-                    {isCompleted && <Check className="h-4.5 w-4.5 stroke-[3px]" />}
-                  </button>
+                  {/* Complete button — hidden in edit mode */}
+                  {!isEditMode && (
+                    <button type="button" onClick={() => {
+                      const current = habit.history[dateToday] || 0;
+                      const remaining = Math.max(0, habit.target - current);
+                      if (remaining > 0) onLogHabit(habit.id, remaining);
+                    }} disabled={isCompleted}
+                      aria-label={isCompleted ? `${habit.name} complete` : `Complete ${habit.name}`}
+                      className={`h-10 w-10 shrink-0 rounded-full border-2 transition flex items-center justify-center active:scale-95 ${isCompleted
+                        ? 'border-[#12B886] bg-[#12B886] text-black'
+                        : 'border-[#30364A] bg-transparent hover:border-[#12B886] hover:bg-[#12B886]/10'}`}>
+                      {isCompleted && <Check className="h-4.5 w-4.5 stroke-[3px]" />}
+                    </button>
+                  )}
                 </div>
-                <div className="mt-3 flex items-center gap-2">
-                  <div className="h-1.5 flex-1 overflow-hidden rounded-full border border-[#242938] bg-[#0D0F17]">
-                    <div className="h-full rounded-full transition-all duration-500"
-                      style={{ width: `${percentage}%`, backgroundColor: config.color, boxShadow: `0 0 6px ${config.color}` }} />
+                {!isEditMode && (
+                  <div className="mt-3 flex items-center gap-2">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full border border-[#242938] bg-[#0D0F17]">
+                      <div className="h-full rounded-full transition-all duration-500"
+                        style={{ width: `${percentage}%`, backgroundColor: config.color, boxShadow: `0 0 6px ${config.color}` }} />
+                    </div>
+                    <span className="w-9 text-right text-[10px] font-mono text-gray-500">{percentage}%</span>
                   </div>
-                  <span className="w-9 text-right text-[10px] font-mono text-gray-500">{percentage}%</span>
-                </div>
+                )}
               </div>
             );
           })}
+
+          {/* Inline Add Habit — only in edit mode */}
+          {isEditMode && onCreateHabitInRoutine && routine && (
+            <div className="rounded-2xl border-2 border-dashed border-[#FCC419]/30 bg-[#FCC419]/5 p-3 transition-all">
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const trimmed = newHabitName.trim();
+                  if (!trimmed || isAddingHabit) return;
+                  setIsAddingHabit(true);
+                  try {
+                    await onCreateHabitInRoutine(routine.id, trimmed, rtCategory);
+                    setNewHabitName('');
+                    addInputRef.current?.focus();
+                  } finally {
+                    setIsAddingHabit(false);
+                  }
+                }}
+                className="flex items-center gap-2"
+              >
+                <span className="h-8 w-8 shrink-0 rounded-full bg-[#FCC419]/15 border border-[#FCC419]/30 flex items-center justify-center text-[#FCC419]">
+                  <Plus className="h-4 w-4" />
+                </span>
+                <input
+                  ref={addInputRef}
+                  type="text"
+                  value={newHabitName}
+                  onChange={(e) => setNewHabitName(e.target.value)}
+                  placeholder="New habit name…"
+                  maxLength={60}
+                  disabled={isAddingHabit}
+                  className="flex-1 bg-transparent text-sm font-semibold text-white placeholder-[#FCC419]/40 outline-none disabled:opacity-50"
+                  autoFocus
+                />
+                {newHabitName.trim() && (
+                  <button
+                    type="submit"
+                    disabled={isAddingHabit}
+                    aria-label="Add habit"
+                    className="h-8 px-3 rounded-xl bg-[#FCC419] text-black text-xs font-extrabold hover:bg-[#FFD43B] transition active:scale-95 disabled:opacity-60 flex items-center gap-1 shrink-0"
+                  >
+                    {isAddingHabit
+                      ? <span className="h-3 w-3 rounded-full border-2 border-black/40 border-t-transparent animate-spin" />
+                      : <><Check className="h-3 w-3 stroke-[3px]" /><span>Add</span></>}
+                  </button>
+                )}
+              </form>
+              <p className="mt-1.5 pl-10 text-[10px] text-[#FCC419]/50 font-medium">Press Enter or tap Add — habit saved instantly</p>
+            </div>
+          )}
         </div>
       </section>
     </div>
@@ -882,6 +1192,8 @@ interface DashboardProps {
   onNavigateToRoutine: (routineId: string) => void;
   selectedCategoryId: Category | null;
   setSelectedCategoryId: (cat: Category | null) => void;
+  onDeleteHabit?: (id: string) => void;
+  onCreateHabitInRoutine?: (routineId: string, name: string, category: Category) => Promise<void>;
 }
 
 // ─── DASHBOARD ────────────────────────────────────────────────────────────────
@@ -889,6 +1201,7 @@ interface DashboardProps {
 export default function Dashboard({
   habits, routines, userPoints, onLogHabit, setTab,
   onNavigateToRoutine, selectedCategoryId, setSelectedCategoryId,
+  onDeleteHabit, onCreateHabitInRoutine,
 }: DashboardProps) {
   const { score: momentumScore, threeDayAvg, trajectory, yesterdayProgress, todayProgress } = calculateMomentum(habits, routines);
   const standaloneHabitsAll = getStandaloneHabits(habits, routines);
@@ -977,6 +1290,35 @@ export default function Dashboard({
 
   // ── All done state ──
   const allDoneToday = totalTodayCount > 0 && doneTodayCount >= totalTodayCount;
+
+  // ── Daily Todo State ──
+  const TODO_STORAGE_KEY = `dashboard_todos_${dateToday}`;
+  const [todos, setTodos] = useState<TodoItem[]>(() => {
+    try { return JSON.parse(localStorage.getItem(TODO_STORAGE_KEY) || 'null') || []; }
+    catch { return []; }
+  });
+  const [isTodoModalOpen, setIsTodoModalOpen] = useState(false);
+
+  const persistTodos = useCallback((next: TodoItem[]) => {
+    setTodos(next);
+    try { localStorage.setItem(TODO_STORAGE_KEY, JSON.stringify(next)); } catch {}
+  }, [TODO_STORAGE_KEY]);
+
+  const handleAddTodo = useCallback((text: string) => {
+    persistTodos([...todos, { id: `todo_${Date.now()}_${Math.random().toString(36).slice(2)}`, text, completed: false }]);
+  }, [todos, persistTodos]);
+
+  const handleToggleTodo = useCallback((id: string) => {
+    persistTodos(todos.map(t => t.id === id ? { ...t, completed: !t.completed } : t));
+  }, [todos, persistTodos]);
+
+  const handleDeleteTodo = useCallback((id: string) => {
+    persistTodos(todos.filter(t => t.id !== id));
+  }, [todos, persistTodos]);
+
+  const todoCompletedCount = todos.filter(t => t.completed).length;
+  const todoTotalCount = todos.length;
+  const todoProgressPct = todoTotalCount > 0 ? Math.round((todoCompletedCount / todoTotalCount) * 100) : 0;
 
   // ── Habit drag-to-reorder state ──
   const HABIT_ORDER_KEY = 'dashboard_habit_order';
@@ -1110,6 +1452,25 @@ export default function Dashboard({
                 <span className="text-[9px] md:text-[10px] font-mono text-orange-400/70 uppercase tracking-wide">day streak</span>
               </div>
             )}
+            {/* Daily Focus Button */}
+            <button
+              id="daily-focus-btn"
+              onClick={() => setIsTodoModalOpen(true)}
+              className="relative flex items-center gap-1.5 border border-[#272B36] bg-[#12141C] hover:bg-[#1E212E] hover:border-[#845EF7]/40 hover:text-white px-2.5 py-1.5 md:px-3 md:py-2 rounded-xl text-[11px] md:text-xs font-semibold text-gray-300 cursor-pointer transition select-none group/todob"
+              style={{ boxShadow: isTodoModalOpen ? '0 0 0 1px rgba(132,94,247,0.3), 0 0 10px rgba(132,94,247,0.12)' : undefined }}
+            >
+              <ListTodo className="w-3 h-3 md:w-3.5 md:h-3.5 text-[#845EF7]" />
+              <span>Daily Focus</span>
+              {todoTotalCount > 0 && (
+                <span className={`inline-flex items-center justify-center h-4 min-w-[1rem] px-1 rounded-full text-[9px] font-mono font-bold ${
+                  todoProgressPct === 100
+                    ? 'bg-[#12B886]/20 text-[#12B886] border border-[#12B886]/30'
+                    : 'bg-[#845EF7]/20 text-[#845EF7] border border-[#845EF7]/30'
+                }`}>
+                  {todoProgressPct === 100 ? '✓' : `${todoCompletedCount}/${todoTotalCount}`}
+                </span>
+              )}
+            </button>
             <button onClick={() => setTab('habits')}
               className="flex items-center gap-1.5 border border-[#272B36] bg-[#12141C] hover:bg-[#1E212E] hover:text-white px-2.5 py-1.5 md:px-3 md:py-2 rounded-xl text-[11px] md:text-xs font-semibold text-gray-300 cursor-pointer transition select-none">
               <span>My Habits</span>
@@ -1307,7 +1668,7 @@ export default function Dashboard({
             {/* Remaining badge + 1-TAP */}
             {(() => {
               const incompleteHabits = standaloneHabitsAll.filter(h => (h.history[dateToday] || 0) < h.target).length;
-              const incompleteRoutines = routines.filter(rt => !getRoutineProgressToday(rt, habits).allDone && habits.filter(h => rt.habitIds.includes(h.id)).length > 0).length;
+              const incompleteRoutines = routines.filter(rt => !getRoutineProgressToday(rt, habits).allDone && getRoutineHabits(rt, habits).length > 0).length;
               const remaining = incompleteHabits + incompleteRoutines;
               return remaining > 0 ? (
                 <span className="text-[10px] font-mono font-bold text-[#12B886] bg-[#12B886]/10 border border-[#12B886]/25 px-2 py-0.5 rounded-full">
@@ -1342,7 +1703,7 @@ export default function Dashboard({
             : standaloneHabitsAll;
 
           const routinesFiltered = selectedPillar
-            ? routines.filter(rt => habits.filter(h => rt.habitIds.includes(h.id) && h.category === selectedPillar).length > 0)
+            ? routines.filter(rt => getRoutineHabits(rt, habits).some(h => h.category === selectedPillar))
             : routines;
 
           const habitMatchesTimeframe = (h: Habit) =>
@@ -1375,16 +1736,15 @@ export default function Dashboard({
           const standaloneHabits = applyHabitOrder(standaloneHabitsRaw);
           const selectedRoutine = routinesFiltered.find(rt => rt.id === selectedRoutineSheetId) || null;
           const selectedRoutineHabits = selectedRoutine
-            ? selectedRoutine.habitIds
-                .map(id => habits.find(h => h.id === id))
-                .filter((h): h is Habit => !!h && habitMatchesTimeframe(h) && (!selectedPillar || h.category === selectedPillar))
+            ? getRoutineHabits(selectedRoutine, habits)
+                .filter((h): h is Habit => habitMatchesTimeframe(h) && (!selectedPillar || h.category === selectedPillar))
             : [];
 
 
 
           const totalVisible =
             routinesFiltered.filter(routineMatchesTimeframe).reduce((acc, rt) => {
-              const filtered = habits.filter(h => rt.habitIds.includes(h.id) && (!selectedPillar || h.category === selectedPillar));
+              const filtered = getRoutineHabits(rt, habits).filter(h => !selectedPillar || h.category === selectedPillar);
               return acc + (filtered.length > 0 ? 1 : 0);
             }, 0) + standaloneHabits.length;
 
@@ -1493,7 +1853,7 @@ export default function Dashboard({
                     return (
                       <>
                         {visibleRoutines.map(rt => {
-                          const rtHabits = habits.filter(h => rt.habitIds.includes(h.id));
+                          const rtHabits = getRoutineHabits(rt, habits);
                           if (rtHabits.length === 0) return null;
                           const { doneCount, totalCount, progress: rtProgress, allDone } = getRoutineProgressToday(rt, habits);
                           const rtCategory = getRoutineCategory(rt, habits);
@@ -1593,6 +1953,8 @@ export default function Dashboard({
                 habits={selectedRoutineHabits}
                 onClose={() => setSelectedRoutineSheetId(null)}
                 onLogHabit={onLogHabit}
+                onDeleteHabit={onDeleteHabit}
+                onCreateHabitInRoutine={onCreateHabitInRoutine}
               />
             </div>
           );
@@ -1659,7 +2021,7 @@ export default function Dashboard({
             </div>
             <div className="space-y-3 max-h-[180px] overflow-y-auto pr-1">
               {routines.map((rt) => {
-                const routineHabits = habits.filter(h => rt.habitIds.includes(h.id));
+                const routineHabits = getRoutineHabits(rt, habits);
                 const completedInRt = routineHabits.filter(h => (h.history[dateToday] || 0) >= h.target).length;
                 const totalInRt = routineHabits.length;
                 const progress = totalInRt > 0 ? Math.round((completedInRt / totalInRt) * 100) : 0;
@@ -1697,6 +2059,20 @@ export default function Dashboard({
         </div>
 
       </div>
+
+      {/* Daily Focus Modal */}
+      {isTodoModalOpen && (
+        <DailyTodoModal
+          todos={todos}
+          onAdd={handleAddTodo}
+          onToggle={handleToggleTodo}
+          onDelete={handleDeleteTodo}
+          onClose={() => setIsTodoModalOpen(false)}
+          completedCount={todoCompletedCount}
+          totalCount={todoTotalCount}
+          progressPct={todoProgressPct}
+        />
+      )}
 
     </div>
   );

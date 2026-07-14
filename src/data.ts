@@ -53,8 +53,12 @@ export const getScheduledHabits = (habits: Habit[], dateStr: string): Habit[] =>
   return habits.filter((habit) => isHabitScheduledForDate(habit, dateStr));
 };
 
+export const isHabitInSpecificRoutine = (habit: Habit, routine: Routine): boolean => {
+  return habit.routineId === routine.id || routine.habitIds.includes(habit.id);
+};
+
 export const isHabitInRoutine = (habit: Habit, routines: Routine[] = []): boolean => {
-  return Boolean(habit.routineId) || routines.some((routine) => routine.habitIds.includes(habit.id));
+  return Boolean(habit.routineId) || routines.some((routine) => isHabitInSpecificRoutine(habit, routine));
 };
 
 export const getStandaloneHabits = (habits: Habit[], routines: Routine[] = []): Habit[] => {
@@ -62,7 +66,10 @@ export const getStandaloneHabits = (habits: Habit[], routines: Routine[] = []): 
 };
 
 export const getRoutineHabits = (routine: Routine, habits: Habit[], dateStr?: string): Habit[] => {
-  const routineHabits = habits.filter((habit) => routine.habitIds.includes(habit.id));
+  const orderedIds = new Map(routine.habitIds.map((id, index) => [id, index]));
+  const routineHabits = habits
+    .filter((habit) => isHabitInSpecificRoutine(habit, routine))
+    .sort((a, b) => (orderedIds.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (orderedIds.get(b.id) ?? Number.MAX_SAFE_INTEGER));
   return dateStr ? getScheduledHabits(routineHabits, dateStr) : routineHabits;
 };
 

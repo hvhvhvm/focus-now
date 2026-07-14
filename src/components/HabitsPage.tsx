@@ -6,7 +6,7 @@ import {
   Target, Moon, ListChecks, CheckCircle2, TrendingUp, FlameKindling
 } from 'lucide-react';
 import { Habit, Category, Routine } from '../types';
-import { dateToday, isHabitScheduledForDate, formatDateString, getStandaloneHabits } from '../data';
+import { dateToday, isHabitScheduledForDate, formatDateString, getStandaloneHabits, getRoutineHabits } from '../data';
 import CategoryDetailView from './CategoryDetailView';
 import { useToast } from './Toast';
 
@@ -24,7 +24,7 @@ const getCatConfig = (cat: Category) => CAT_CFG[cat] ?? { color: '#868E96', emoj
 
 // ─── ROUTINE DOMINANT CATEGORY ────────────────────────────────────────────────
 const getRoutineDomCategory = (routine: Routine, habits: Habit[]): Category => {
-  const rh = habits.filter(h => routine.habitIds.includes(h.id));
+  const rh = getRoutineHabits(routine, habits);
   if (rh.length === 0) return 'Mindset';
   const counts: Record<string, number> = {};
   rh.forEach(h => { counts[h.category] = (counts[h.category] || 0) + 1; });
@@ -37,7 +37,7 @@ const getRoutineDomCategory = (routine: Routine, habits: Habit[]): Category => {
 };
 
 const getHabitTimeframeLocal = (habit: Habit, routines: Routine[]): 'Morning'|'Evening'|'Night'|'Anytime' => {
-  const parent = routines.find(r => r.habitIds.includes(habit.id));
+  const parent = routines.find(r => r.habitIds.includes(habit.id) || habit.routineId === r.id);
   if (parent) {
     if (parent.timeBlock === 'Morning') return 'Morning';
     if (parent.timeBlock === 'Evening') return 'Evening';
@@ -73,9 +73,7 @@ interface HabitsPageProps {
   openCreateRoutine: () => void;
   onEditHabit: (habit: Habit) => void;
   onRevertHabit: (id: string) => void;
-  onEditRoutine: (routine: Routine) => void;
   onDeleteRoutine: (routineId: string) => void;
-  onAddHabitToRoutine: (routineId: string) => void;
   selectedRoutineId: string | null;
   setSelectedRoutineId: (id: string | null) => void;
   selectedCategoryId: Category | null;
@@ -85,18 +83,18 @@ interface HabitsPageProps {
 export default function HabitsPage({
   habits, routines, onLogHabit, onDeleteHabit, deletingHabitId,
   openCreateHabit, openCreateRoutine, onEditHabit, onRevertHabit,
-  onEditRoutine, onDeleteRoutine, onAddHabitToRoutine,
+  onDeleteRoutine,
   selectedRoutineId, setSelectedRoutineId, selectedCategoryId, setSelectedCategoryId,
 }: HabitsPageProps) {
   const toast = useToast();
-  const [activeSubTab,    setActiveSubTab]    = useState<'all'|'routines'>('all');
-  const [selectedFilter,  setSelectedFilter]  = useState<'active'|'completed'>('active');
-  const [selectedCategory,setSelectedCategory]= useState<Category|'All'>('All');
-  const [expandedHabitId, setExpandedHabitId] = useState<string | null>(null);
-  const [menuOpenId,      setMenuOpenId]      = useState<string | null>(null);
-  const [activeTimerId,   setActiveTimerId]   = useState<string | null>(null);
-  const [timeLeft,        setTimeLeft]        = useState<number>(0);
-  const [isTimerRunning,  setIsTimerRunning]  = useState<boolean>(false);
+  const [activeSubTab,      setActiveSubTab]      = useState<'all'|'routines'>('all');
+  const [selectedFilter,    setSelectedFilter]    = useState<'active'|'completed'>('active');
+  const [selectedCategory,  setSelectedCategory]  = useState<Category|'All'>('All');
+  const [expandedHabitId,   setExpandedHabitId]   = useState<string | null>(null);
+  const [menuOpenId,        setMenuOpenId]        = useState<string | null>(null);
+  const [activeTimerId,     setActiveTimerId]     = useState<string | null>(null);
+  const [timeLeft,          setTimeLeft]          = useState<number>(0);
+  const [isTimerRunning,    setIsTimerRunning]    = useState<boolean>(false);
 
   // Focus timer tick
   useEffect(() => {
@@ -161,7 +159,7 @@ export default function HabitsPage({
   if (selectedRoutineId) {
     const rt = routines.find(r => r.id === selectedRoutineId);
     if (!rt) { setSelectedRoutineId(null); return null; }
-    const rh = habits.filter(h => rt.habitIds.includes(h.id));
+    const rh = getRoutineHabits(rt, habits);
     const doneInRt = rh.filter(h => (h.history[dateToday]||0) >= h.target).length;
     const allDone = rh.length > 0 && doneInRt === rh.length;
     const progressPct = rh.length > 0 ? Math.round((doneInRt / rh.length) * 100) : 0;
@@ -215,7 +213,7 @@ export default function HabitsPage({
                   {rt.repeat} · {rh.length} habit{rh.length !== 1 ? 's' : ''}
                 </p>
               </div>
-              {/* Points badge */}
+              {/* Right side: Points badge */}
               <div className="shrink-0 flex flex-col items-end gap-3">
                 <div className="bg-[#FCC419]/10 border border-[#FCC419]/25 rounded-xl px-3 py-2 text-center">
                   <span className="text-[9px] font-mono text-gray-500 uppercase block">Bonus Award</span>
@@ -269,7 +267,7 @@ export default function HabitsPage({
             <button
               type="button"
               onClick={() => rh.filter(h => (h.history[dateToday]||0) < h.target).forEach(h => onLogHabit(h.id, Math.max(0, h.target - (h.history[dateToday]||0))))}
-              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-extrabold text-sm px-4 py-3.5 rounded-xl cursor-pointer transition shadow-lg shadow-emerald-500/20 active:scale-95 min-h-[48px]"
+              className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white font-extrabold text-sm px-4 py-3.5 rounded-xl cursor-pointer transition shadow-lg shadow-emerald-500/20 active:scale-[0.95] min-h-[48px]"
             >
               <CheckCircle2 className="w-5 h-5" />
               Complete All Habits
@@ -289,24 +287,10 @@ export default function HabitsPage({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => onAddHabitToRoutine(rt.id)}
-              className="flex-1 flex items-center justify-center gap-1.5 bg-[#1A1D2A] hover:bg-[#22263A] border border-purple-500/25 hover:border-purple-500/50 text-purple-400 font-bold text-xs px-3 py-2.5 rounded-xl cursor-pointer transition active:scale-95 min-h-[40px]"
-            >
-              <Plus className="w-3.5 h-3.5" /> Add Habit
-            </button>
-            <button
-              type="button"
-              onClick={() => onEditRoutine(rt)}
-              className="flex-1 flex items-center justify-center gap-1.5 bg-[#1A1D2A] hover:bg-[#22263A] border border-[#2A2F40] hover:border-gray-600 text-gray-300 font-bold text-xs px-3 py-2.5 rounded-xl cursor-pointer transition active:scale-95 min-h-[40px]"
-            >
-              <Pencil className="w-3.5 h-3.5" /> Edit
-            </button>
-            <button
-              type="button"
               onClick={() => onDeleteRoutine(rt.id)}
-              className="flex items-center justify-center gap-1.5 bg-red-500/8 hover:bg-red-500/15 border border-red-500/25 hover:border-red-500/40 text-red-400 font-bold text-xs px-3 py-2.5 rounded-xl cursor-pointer transition active:scale-95 min-h-[40px]"
+              className="w-full flex items-center justify-center gap-1.5 bg-red-500/8 hover:bg-red-500/15 border border-red-500/25 hover:border-red-500/40 text-red-400 font-bold text-xs px-3 py-2.5 rounded-xl cursor-pointer transition active:scale-95 min-h-[40px]"
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 className="w-3.5 h-3.5" /> Delete Routine
             </button>
           </div>
         </div>
@@ -331,14 +315,7 @@ export default function HabitsPage({
                 <Plus className="w-6 h-6 text-purple-400" />
               </div>
               <p className="text-sm font-bold text-gray-300">No habits in this routine yet</p>
-              <p className="text-xs text-gray-500 mt-1 mb-4">Add your first habit to get started</p>
-              <button
-                type="button"
-                onClick={() => onAddHabitToRoutine(rt.id)}
-                className="flex items-center gap-2 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 text-purple-400 font-bold text-xs px-4 py-2.5 rounded-xl cursor-pointer transition"
-              >
-                <Plus className="w-4 h-4" /> Add First Habit
-              </button>
+              <p className="text-xs text-gray-500 mt-1.5">Open this routine in Quick Habit Logger on the Dashboard to add habits</p>
             </div>
           ) : (
             <div className="divide-y divide-[#1C1F2B]">
@@ -405,28 +382,6 @@ export default function HabitsPage({
 
                       {/* Action buttons */}
                       <div className="flex items-center gap-1.5 shrink-0">
-                        {/* Delete habit (always visible on hover) */}
-                        <button
-                          type="button"
-                          onClick={() => onDeleteHabit(item.id)}
-                          disabled={!!deletingHabitId}
-                          className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition cursor-pointer disabled:opacity-30"
-                          title="Delete habit"
-                        >
-                          {deletingHabitId === item.id
-                            ? <RotateCcw className="w-3.5 h-3.5 animate-spin" />
-                            : <Trash2 className="w-3.5 h-3.5" />
-                          }
-                        </button>
-                        {/* Edit habit */}
-                        <button
-                          type="button"
-                          onClick={() => onEditHabit(item)}
-                          className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-gray-600 hover:text-purple-400 hover:bg-purple-500/10 transition cursor-pointer"
-                          title="Edit habit"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
                         {!done ? (
                           <div className="flex items-center gap-1.5">
                             <button
@@ -461,17 +416,7 @@ export default function HabitsPage({
             </div>
           )}
 
-          {/* Footer: Add Habit to Routine */}
-          <div className="px-5 py-4 border-t border-[#1C1F2B]">
-            <button
-              type="button"
-              onClick={() => onAddHabitToRoutine(rt.id)}
-              className="w-full flex items-center justify-center gap-2 py-2.5 border border-dashed border-purple-500/25 hover:border-purple-500/50 rounded-xl text-[11px] font-bold text-purple-400 hover:bg-purple-500/5 transition cursor-pointer active:scale-[0.98]"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              Add Habit to this Routine
-            </button>
-          </div>
+
         </div>
       </div>
     );
@@ -786,7 +731,7 @@ export default function HabitsPage({
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {routines.map(rt => {
-                const rh   = habits.filter(h => rt.habitIds.includes(h.id) && isHabitScheduledForDate(h, dateToday));
+                const rh   = getRoutineHabits(rt, habits).filter(h => isHabitScheduledForDate(h, dateToday));
                 const done = rh.filter(h => (h.history[dateToday]||0) >= h.target).length;
                 const pct  = rh.length > 0 ? Math.round((done/rh.length)*100) : 0;
                 const allDone = rh.length > 0 && done === rh.length;
@@ -871,24 +816,14 @@ export default function HabitsPage({
                       >
                         <ListChecks className="w-3.5 h-3.5" /> View Steps
                       </button>
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); onEditRoutine(rt); }}
-                          className="p-1.5 rounded-lg text-gray-500 hover:text-purple-400 hover:bg-purple-500/10 transition cursor-pointer"
-                          title="Edit routine"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); onDeleteRoutine(rt.id); }}
-                          className="p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition cursor-pointer"
-                          title="Delete routine"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); onDeleteRoutine(rt.id); }}
+                        className="p-1.5 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition cursor-pointer"
+                        title="Delete routine"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
                 );

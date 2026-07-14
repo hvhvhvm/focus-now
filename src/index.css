@@ -100,3 +100,13 @@ button, a, [role="button"] {
     transform: translateY(0);
   }
 }
+
+/* Edit mode — delete button entrance wiggle */
+@keyframes editWiggle {
+  0%   { transform: rotate(0deg); }
+  20%  { transform: rotate(-8deg); }
+  40%  { transform: rotate(6deg); }
+  60%  { transform: rotate(-4deg); }
+  80%  { transform: rotate(2deg); }
+  100% { transform: rotate(0deg); }
+}

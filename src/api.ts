@@ -20,6 +20,44 @@ function hasDemoCredentials(): boolean {
   return Boolean(import.meta.env.VITE_DEMO_EMAIL && import.meta.env.VITE_DEMO_PASSWORD);
 }
 
+async function appendHabitToRoutine(routineId: string, habitId: string): Promise<void> {
+  const { data: routine, error: fetchError } = await supabase
+    .from('routines')
+    .select('habit_ids')
+    .eq('id', routineId)
+    .maybeSingle();
+  if (fetchError) throw new ApiError(fetchError.message, 500);
+  if (!routine) throw new ApiError('Routine not found.', 404);
+
+  const currentIds = Array.isArray(routine.habit_ids) ? routine.habit_ids : [];
+  if (currentIds.includes(habitId)) return;
+
+  const { error: updateError } = await supabase
+    .from('routines')
+    .update({ habit_ids: [...currentIds, habitId] })
+    .eq('id', routineId);
+  if (updateError) throw new ApiError(updateError.message, 500);
+}
+
+async function removeHabitFromRoutine(routineId: string, habitId: string): Promise<void> {
+  const { data: routine, error: fetchError } = await supabase
+    .from('routines')
+    .select('habit_ids')
+    .eq('id', routineId)
+    .maybeSingle();
+  if (fetchError) throw new ApiError(fetchError.message, 500);
+  if (!routine) return;
+
+  const currentIds = Array.isArray(routine.habit_ids) ? routine.habit_ids : [];
+  if (!currentIds.includes(habitId)) return;
+
+  const { error: updateError } = await supabase
+    .from('routines')
+    .update({ habit_ids: currentIds.filter((id: string) => id !== habitId) })
+    .eq('id', routineId);
+  if (updateError) throw new ApiError(updateError.message, 500);
+}
+
 export const api = {
   // Authentication & Profile
   async login(emailStr: string, passwordStr: string) {
@@ -212,6 +250,11 @@ export const api = {
 
     const { data, error } = await supabase.from('habits').insert([payload]).select().single();
     if (error) throw new ApiError(error.message, 500);
+
+    if (habitData.routineId) {
+      await appendHabitToRoutine(habitData.routineId, data.id);
+    }
+
     return {
         id: data.id,
         name: data.name,
@@ -274,6 +317,17 @@ export const api = {
     const { data: userAuth } = await supabase.auth.getUser();
     if (!userAuth.user) throw new ApiError('Not authenticated', 401);
 
+    const shouldSyncRoutineLink = habitData.routineId !== undefined;
+    const { data: currentHabit, error: currentErr } = shouldSyncRoutineLink
+      ? await supabase
+          .from('habits')
+          .select('routine_id')
+          .eq('id', habitId)
+          .eq('user_id', userAuth.user.id)
+          .maybeSingle()
+      : { data: null, error: null };
+    if (currentErr) throw new ApiError(currentErr.message, 500);
+
     const payload: any = {};
     if (habitData.name !== undefined) payload.name = habitData.name;
     if (habitData.category !== undefined) payload.category = habitData.category;
@@ -289,6 +343,18 @@ export const api = {
 
     const { data, error } = await supabase.from('habits').update(payload).eq('id', habitId).select().single();
     if (error) throw new ApiError(error.message, 500);
+
+    if (shouldSyncRoutineLink) {
+      const previousRoutineId = currentHabit?.routine_id || null;
+      const nextRoutineId = habitData.routineId || null;
+
+      if (previousRoutineId && previousRoutineId !== nextRoutineId) {
+        await removeHabitFromRoutine(previousRoutineId, habitId);
+      }
+      if (nextRoutineId && previousRoutineId !== nextRoutineId) {
+        await appendHabitToRoutine(nextRoutineId, habitId);
+      }
+    }
 
     return {
         id: data.id,
@@ -334,6 +400,13 @@ export const api = {
     const { data: logs, error: lErr } = await supabase.from('routine_logs').select('*').eq('user_id', userAuth.user.id);
     if (lErr) throw new ApiError(lErr.message, 500);
 
+    const { data: routineLinkedHabits, error: hErr } = await supabase
+      .from('habits')
+      .select('id, routine_id')
+      .eq('user_id', userAuth.user.id)
+      .not('routine_id', 'is', null);
+    if (hErr) throw new ApiError(hErr.message, 500);
+
     return routines.map((rt: any) => {
       const rLogs = logs.filter((l: any) => l.routine_id === rt.id);
       const completedMap: { [date: string]: boolean } = {};
@@ -348,7 +421,12 @@ export const api = {
         timeBlock: rt.time_block,
         repeat: rt.repeat,
         repeatDays: rt.repeat_days,
-        habitIds: rt.habit_ids || [],
+        habitIds: Array.from(new Set([
+          ...(Array.isArray(rt.habit_ids) ? rt.habit_ids : []),
+          ...((routineLinkedHabits || [])
+            .filter((habit: any) => habit.routine_id === rt.id)
+            .map((habit: any) => habit.id))
+        ])),
         completedHistory: completedMap,
       };
     });
